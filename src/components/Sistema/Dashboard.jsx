@@ -1,0 +1,430 @@
+import React, { useState, useEffect } from "react";
+import { NavLink, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import OrdemServico from "./OrdemServico";
+import Compras from "./Compras";
+import Estoque from "./Estoque";
+import Financeiro from "./Financeiro";
+import CRM from "./CRM";
+import Automacao from "./Automacao";
+import Home from "./Home";
+import UserProfile from "./UserProfile"; // Novo componente para perfil do usuário
+import "../styles/Dashboard.css";
+
+// Ícones para cada rota/aba
+const menu = [
+  { label: "Dashboard", path: "home", icon: "📊", description: "Visão geral do sistema" },
+  { label: "Ordem de Serviço", path: "os", icon: "📝", description: "Gestão de ordens e chamados" },
+  { label: "Compras", path: "compras", icon: "🛒", description: "Cotações e fornecedores" },
+  { label: "Estoque", path: "estoque", icon: "📦", description: "Controle de inventário" },
+  { label: "Financeiro", path: "financeiro", icon: "💰", description: "Contas e fluxo de caixa" },
+  { label: "CRM", path: "crm", icon: "💬", description: "Gestão de clientes" },
+  { label: "Automação", path: "automacao", icon: "🤖", description: "Processos automatizados" }
+];
+
+// Componente de Breadcrumb para melhorar a navegação
+const Breadcrumb = () => {
+  const location = useLocation();
+  const currentPath = location.pathname.split('/').filter(x => x);
+  // Pegamos apenas o último segmento do caminho após "dashboard"
+  const dashboardIndex = currentPath.findIndex(segment => segment === "dashboard");
+  const activePath = dashboardIndex >= 0 && dashboardIndex + 1 < currentPath.length 
+    ? currentPath[dashboardIndex + 1] 
+    : "home";
+  
+  // Verificar se estamos na página de perfil
+  if (activePath === "perfil") {
+    return (
+      <div className="breadcrumb">
+        <span className="breadcrumb-home">SmartOps</span>
+        <span className="breadcrumb-separator">/</span>
+        <span className="breadcrumb-current">Meu Perfil</span>
+      </div>
+    );
+  }
+  
+  const currentMenu = menu.find(item => item.path === activePath);
+
+  return (
+    <div className="breadcrumb">
+      <span className="breadcrumb-home">SmartOps</span>
+      <span className="breadcrumb-separator">/</span>
+      {currentMenu && (
+        <span className="breadcrumb-current">
+          {currentMenu.label}
+        </span>
+      )}
+    </div>
+  );
+};
+
+// Componente de Tooltip para os itens do menu
+const MenuTooltip = ({ children, tooltip }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  
+  return (
+    <div 
+      className="tooltip-container"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {children}
+      {showTooltip && (
+        <div className="tooltip">
+          {tooltip}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Componente da Barra Lateral
+function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const userName = localStorage.getItem("userName") || "Usuário";
+  const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
+  const userInitial = userName.charAt(0).toUpperCase();
+  
+  // Fechar menu móvel ao mudar de rota
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      toggleMobileMenu();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const handleProfileClick = () => {
+    // Navegação absoluta para evitar acumulação de caminhos
+    navigate("/dashboard/perfil");
+  };
+
+  return (
+    <aside className={`sidebar ${isMobileMenuOpen ? "open" : ""}`}>
+      <div className="logo-container">
+        <h1 className="logo">
+          <span className="logo-icon">S</span>
+          SmartOps
+        </h1>
+      </div>
+      
+      <div className="menu-section">
+        <div className="menu-title">
+          Menu Principal
+        </div>
+      </div>
+      
+      <nav className="main-nav">
+        <ul className="nav-list">
+          {menu.map(item => (
+            <li key={item.path} className="nav-item">
+              <MenuTooltip tooltip={item.description}>
+                <NavLink
+                  to={`/dashboard/${item.path}`} // Caminho absoluto para evitar acumulação
+                  className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                  end
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="menu-text">{item.label}</span>
+                </NavLink>
+              </MenuTooltip>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      
+      <div className="menu-section support-section">
+        <div className="menu-title">
+          Suporte
+        </div>
+      </div>
+      
+      <div className="support-container">
+        <a href="#help" className="support-link">
+          <span className="support-icon">❓</span>
+          <span className="menu-text">Ajuda e Suporte</span>
+        </a>
+      </div>
+      
+      <div className="user-profile">
+        <div className="profile-card" onClick={handleProfileClick}>
+          <div className="avatar">{userInitial}</div>
+          <div className="user-info">
+            <div className="user-name">{userName}</div>
+            <div className="user-email">{userEmail}</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// Componente de menu dropdown do usuário
+const UserDropdown = ({ isOpen, onClose, onLogout, onProfileClick }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="user-dropdown">
+      <div className="dropdown-arrow"></div>
+      <ul className="dropdown-menu">
+        <li className="dropdown-item" onClick={onProfileClick}>
+          <span className="dropdown-icon">👤</span>
+          Meu Perfil
+        </li>
+        <li className="dropdown-item">
+          <span className="dropdown-icon">⚙️</span>
+          Configurações
+        </li>
+        <li className="dropdown-divider"></li>
+        <li className="dropdown-item logout-item" onClick={onLogout}>
+          <span className="dropdown-icon">🚪</span>
+          Sair
+        </li>
+      </ul>
+    </div>
+  );
+};
+
+// Componente de Header com controles de navegação
+const Header = ({ toggleMobileMenu }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  
+  // Extrair o caminho ativo após "dashboard"
+  const currentPath = location.pathname.split('/').filter(x => x);
+  const dashboardIndex = currentPath.findIndex(segment => segment === "dashboard");
+  const activePath = dashboardIndex >= 0 && dashboardIndex + 1 < currentPath.length 
+    ? currentPath[dashboardIndex + 1] 
+    : "home";
+  
+  // Verificar se estamos na página de perfil
+  const isProfilePage = activePath === "perfil";
+  const pageTitle = isProfilePage ? "Meu Perfil" : (menu.find(item => item.path === activePath)?.label || "");
+  const pageIcon = isProfilePage ? "👤" : (menu.find(item => item.path === activePath)?.icon || "");
+  
+  const userName = localStorage.getItem("userName") || "Usuário";
+  const userInitial = userName.charAt(0).toUpperCase();
+  
+  const handleLogout = () => {
+    // Limpar dados de autenticação
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    
+    // Redirecionar para a página de login
+    navigate("/sistema");
+  };
+  
+  const handleProfileClick = () => {
+    setUserMenuOpen(false);
+    // Navegação absoluta para evitar acumulação de caminhos
+    navigate("/dashboard/perfil");
+  };
+  
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const userMenu = document.querySelector('.user-menu-container');
+      const notificationButton = document.querySelector('.notification-button');
+      
+      if (userMenuOpen && userMenu && !userMenu.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+      
+      if (notificationsOpen && notificationButton && !notificationButton.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen, notificationsOpen]);
+  
+  return (
+    <header className="main-header">
+      <div className="header-title-section">
+        <h2 className="page-title">
+          <span className="page-icon">{pageIcon}</span>
+          {pageTitle}
+        </h2>
+        <Breadcrumb />
+      </div>
+      
+      <div className="header-actions">
+        <div className="notification-container">
+          <button 
+            className="action-button notification-button" 
+            aria-label="Notificações"
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+          >
+            🔔
+            <span className="notification-badge">3</span>
+          </button>
+          
+          {notificationsOpen && (
+            <div className="notifications-dropdown">
+              <div className="dropdown-arrow"></div>
+              <div className="notifications-header">
+                <h3>Notificações</h3>
+                <button className="mark-all-read">Marcar todas como lidas</button>
+              </div>
+              <ul className="notifications-list">
+                <li className="notification-item unread">
+                  <div className="notification-icon">📝</div>
+                  <div className="notification-content">
+                    <p className="notification-text">Nova ordem de serviço criada</p>
+                    <p className="notification-time">Há 10 minutos</p>
+                  </div>
+                </li>
+                <li className="notification-item unread">
+                  <div className="notification-icon">📦</div>
+                  <div className="notification-content">
+                    <p className="notification-text">Estoque baixo de produto #1234</p>
+                    <p className="notification-time">Há 2 horas</p>
+                  </div>
+                </li>
+                <li className="notification-item unread">
+                  <div className="notification-icon">💰</div>
+                  <div className="notification-content">
+                    <p className="notification-text">Pagamento recebido de Cliente XYZ</p>
+                    <p className="notification-time">Há 1 dia</p>
+                  </div>
+                </li>
+              </ul>
+              <div className="notifications-footer">
+                <a href="#all-notifications" className="view-all">Ver todas</a>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="user-menu-container">
+          <button 
+            className="user-menu-button" 
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            aria-label="Menu do usuário"
+          >
+            <div className="user-avatar-small">{userInitial}</div>
+            <span className="user-name-small">{userName}</span>
+            <span className="dropdown-arrow-icon">▼</span>
+          </button>
+          
+          <UserDropdown 
+            isOpen={userMenuOpen} 
+            onClose={() => setUserMenuOpen(false)}
+            onLogout={handleLogout}
+            onProfileClick={handleProfileClick}
+          />
+        </div>
+        
+        <button 
+          className="mobile-menu-button"
+          onClick={toggleMobileMenu}
+          aria-label="Menu"
+        >
+          ☰
+        </button>
+      </div>
+    </header>
+  );
+};
+
+// Componente principal do Dashboard
+export default function Dashboard() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Verificar autenticação ao carregar
+  useEffect(() => {
+    const authToken = localStorage.getItem("authToken");
+    if (!authToken) {
+      navigate("/sistema");
+    }
+  }, [navigate]);
+  
+  // Redirecionar para a rota correta se estiver na raiz do dashboard
+  useEffect(() => {
+    if (location.pathname === "/dashboard") {
+      navigate("/dashboard/home");
+    }
+  }, [location.pathname, navigate]);
+  
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // Fechar menu ao clicar fora dele
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const sidebar = document.querySelector('.sidebar');
+      const menuButton = document.querySelector('.mobile-menu-button');
+      
+      if (
+        isMobileMenuOpen && 
+        sidebar && 
+        !sidebar.contains(event.target) && 
+        menuButton && 
+        !menuButton.contains(event.target)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobileMenuOpen]);
+
+  // Impedir scrolling quando menu móvel está aberto
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobileMenuOpen]);
+
+  return (
+    <div className="dashboard-container">
+      <Sidebar isMobileMenuOpen={isMobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
+      
+      <div className={`main-content ${isMobileMenuOpen ? "shifted" : ""}`}>
+        <Header toggleMobileMenu={toggleMobileMenu} />
+        
+        <div className="content-wrapper">
+          <Routes>
+            {/* Rotas com caminhos absolutos para evitar acumulação */}
+            <Route path="/" element={<Navigate to="/dashboard/home" replace />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/os" element={<OrdemServico />} />
+            <Route path="/compras" element={<Compras />} />
+            <Route path="/estoque" element={<Estoque />} />
+            <Route path="/financeiro" element={<Financeiro />} />
+            <Route path="/crm" element={<CRM />} />
+            <Route path="/automacao" element={<Automacao />} />
+            <Route path="/perfil" element={<UserProfile />} />
+            {/* Rota de fallback para redirecionamento */}
+            <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
+          </Routes>
+        </div>
+      </div>
+      
+      {/* Overlay para quando o menu móvel está aberto */}
+      {isMobileMenuOpen && (
+        <div 
+          className="mobile-overlay"
+          onClick={toggleMobileMenu}
+        />
+      )}
+    </div>
+  );
+}
