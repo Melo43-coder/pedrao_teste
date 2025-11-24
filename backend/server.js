@@ -25,9 +25,9 @@ try {
 }
 
 // Configurações do Twilio
-const accountSid = process.env.TWILIO_ACCOUNT_SID || 'ACa2738c0f2fced8b1ea97cc24cc1680e7';
-const authToken = process.env.TWILIO_AUTH_TOKEN || '[AuthToken]';
-const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
 const client = twilio(accountSid, authToken);
 
