@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import OrdemServico from "./OrdemServico";
 import Compras from "./Compras";
 import Estoque from "./Estoque";
 import Financeiro from "./Financeiro";
 import CRM from "./CRM";
+import Chat from "./Chat";
 import Automacao from "./Automacao";
 import Home from "./Home";
 import UserProfile from "./UserProfile"; // Novo componente para perfil do usuário
+import UsersEdit from "./UsersEdit"; // Área de edição/cadastro/exclusão de usuários (admin/gerente)
 import "../styles/Dashboard.css";
+
+// small helper to format normalized CNPJ (only digits)
+function formatCnpjDigits(value) {
+  if (!value) return '';
+  const s = value.replace(/\D/g, '');
+  if (s.length !== 14) return value;
+  return `${s.substring(0,2)}.${s.substring(2,5)}.${s.substring(5,8)}/${s.substring(8,12)}-${s.substring(12,14)}`;
+}
 
 // Ícones para cada rota/aba
 const menu = [
@@ -17,7 +28,8 @@ const menu = [
   { label: "Compras", path: "compras", icon: "🛒", description: "Cotações e fornecedores" },
   { label: "Estoque", path: "estoque", icon: "📦", description: "Controle de inventário" },
   { label: "Financeiro", path: "financeiro", icon: "💰", description: "Contas e fluxo de caixa" },
-  { label: "CRM", path: "crm", icon: "💬", description: "Gestão de clientes" },
+  { label: "CRM", path: "crm", icon: "👥", description: "Gestão de clientes" },
+  { label: "Chat", path: "chat", icon: "💬", description: "Comunicação em tempo real" },
   { label: "Automação", path: "automacao", icon: "🤖", description: "Processos automatizados" }
 ];
 
@@ -84,6 +96,9 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
   const userName = localStorage.getItem("userName") || "Usuário";
   const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
   const userInitial = userName.charAt(0).toUpperCase();
+  const userRole = localStorage.getItem('userRole') || 'user';
+  const companyCnpj = localStorage.getItem('companyCnpj') || '';
+  const companyBadge = companyCnpj ? formatCnpjDigits(companyCnpj) : '';
   
   // Fechar menu móvel ao mudar de rota
   useEffect(() => {
@@ -144,6 +159,17 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
           <span className="menu-text">Ajuda e Suporte</span>
         </a>
       </div>
+      {/* Admin-only link to manage company users */}
+      {userRole === 'admin' && (
+        <div style={{ padding: '8px 20px' }}>
+          <a href="/dashboard/crm" className="menu-link crm-link">Usuários (empresa){companyBadge ? <span className="company-badge">{companyBadge}</span> : null}</a>
+        </div>
+      )}
+      {(userRole === 'admin' || userRole === 'gerente') && (
+        <div style={{ padding: '4px 20px 12px' }}>
+          <a href="/dashboard/users-edit" className="menu-link crm-link">Gerenciar Usuários</a>
+        </div>
+      )}
       
       <div className="user-profile">
         <div className="profile-card" onClick={handleProfileClick}>
@@ -190,6 +216,7 @@ const Header = ({ toggleMobileMenu }) => {
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [toastNotification, setToastNotification] = useState(null);
   
   // Extrair o caminho ativo após "dashboard"
   const currentPath = location.pathname.split('/').filter(x => x);
@@ -205,6 +232,38 @@ const Header = ({ toggleMobileMenu }) => {
   
   const userName = localStorage.getItem("userName") || "Usuário";
   const userInitial = userName.charAt(0).toUpperCase();
+
+  // Função para tocar som de sino
+  const playBellSound = () => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.2);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.4);
+  };
+
+  // Função para exibir notificação com som
+  const showNotification = (title, message, type = 'success') => {
+    playBellSound();
+    setToastNotification({ title, message, type });
+    setTimeout(() => setToastNotification(null), 4000);
+  };
+
+  // Expor função globalmente para uso em outros componentes
+  useEffect(() => {
+    window.showHeaderNotification = showNotification;
+    return () => delete window.showHeaderNotification;
+  }, []);
   
   const handleLogout = () => {
     // Limpar dados de autenticação
@@ -244,6 +303,44 @@ const Header = ({ toggleMobileMenu }) => {
   }, [userMenuOpen, notificationsOpen]);
   
   return (
+    <>
+      {/* Toast Notification */}
+      {toastNotification && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            padding: '16px 20px',
+            borderRadius: '8px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            minWidth: '350px',
+            backgroundColor: toastNotification.type === 'critical' ? '#ef4444' : 
+                            toastNotification.type === 'warning' ? '#f59e0b' : '#10b981',
+            color: 'white',
+            fontWeight: '600',
+            fontSize: '14px',
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI'",
+          }}
+        >
+          <span style={{ fontSize: '22px' }}>
+            {toastNotification.type === 'critical' ? '🔔' : 
+             toastNotification.type === 'warning' ? '⚠️' : '✅'}
+          </span>
+          <div>
+            <div style={{ fontWeight: '700', marginBottom: '4px' }}>{toastNotification.title}</div>
+            <div style={{ fontSize: '13px', opacity: 0.9 }}>{toastNotification.message}</div>
+          </div>
+        </motion.div>
+      )}
+    
     <header className="main-header">
       <div className="header-title-section">
         <h2 className="page-title">
@@ -329,6 +426,7 @@ const Header = ({ toggleMobileMenu }) => {
         </button>
       </div>
     </header>
+    </>
   );
 };
 
@@ -410,7 +508,9 @@ export default function Dashboard() {
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/crm" element={<CRM />} />
+            <Route path="/chat" element={<Chat />} />
             <Route path="/automacao" element={<Automacao />} />
+            <Route path="/users-edit" element={<UsersEdit />} />
             <Route path="/perfil" element={<UserProfile />} />
             {/* Rota de fallback para redirecionamento */}
             <Route path="*" element={<Navigate to="/dashboard/home" replace />} />

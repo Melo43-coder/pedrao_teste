@@ -4,30 +4,90 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
   LineChart, Line, AreaChart, Area
 } from "recharts";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from 'leaflet';
-import "leaflet/dist/leaflet.css";
-import { FiUsers, FiTruck, FiAlertCircle, FiCalendar, FiBarChart2, FiPieChart, FiMap, FiActivity } from "react-icons/fi";
+import { FiUsers, FiTruck, FiAlertCircle, FiCalendar, FiBarChart2, FiPieChart, FiMap, FiActivity, FiMapPin } from "react-icons/fi";
 import { format } from "date-fns";
 import ptBR from "date-fns/locale/pt-BR";
+import firebase from "../../services/firebase";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 // Importar imagens para ícones personalizados
-// Você precisará criar esses arquivos na pasta public/assets/icons/
 const carIconUrl = "/assets/icons/car.png";
 const personIconUrl = "/assets/icons/user.png";
 
-// Configuração dos ícones personalizados
-const createCustomIcon = (url, size, className) => {
-  return L.icon({
-    iconUrl: url,
-    iconSize: size,
-    iconAnchor: [size[0]/2, size[1]],
-    popupAnchor: [0, -size[1]],
-    className: className
-  });
-};
+// Componente para controlar o mapa - fazer zoom/pan automático
+function MapController({ markers }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (markers && markers.length > 0) {
+      // Criar bounds dos marcadores
+      const bounds = L.latLngBounds(markers.map(m => [m.lat, m.lng]));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [markers, map]);
+  
+  return null;
+}
 
-// Dados simulados
+// Componente de Marcador customizado
+function OrderMarker({ marker, theme }) {
+  const prioridadeColor = marker.prioridade === 'Alta' ? '#ef4444' : marker.prioridade === 'Média' ? '#f59e0b' : '#10b981';
+  const statusIcon = marker.status === 'Pendente' ? '⏳' : marker.status === 'Em andamento' ? '🔄' : marker.status === 'Concluída' ? '✅' : marker.status === 'Cancelada' ? '❌' : '⚠️';
+  
+  const customIcon = L.divIcon({
+    html: `<div style="
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: ${prioridadeColor};
+      border: 4px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px ${prioridadeColor}80;
+      animation: pulse 2s infinite;
+    ">
+      ${statusIcon}
+    </div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    className: 'custom-marker'
+  });
+  
+  return (
+    <Marker position={[marker.lat, marker.lng]} icon={customIcon}>
+      <Popup>
+        <div style={{ fontSize: '13px', minWidth: '250px' }}>
+          <div style={{ backgroundColor: prioridadeColor, color: 'white', padding: '8px', borderRadius: '4px', marginBottom: '8px' }}>
+            <div style={{ fontWeight: '700', fontSize: '14px' }}>{marker.nome}</div>
+            <div style={{ fontSize: '11px', opacity: 0.9 }}>Prioridade: {marker.prioridade}</div>
+          </div>
+          <div style={{ display: 'grid', gap: '6px' }}>
+            <div>
+              <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '2px' }}>📍 ENDEREÇO</div>
+              <div style={{ fontSize: '12px' }}>{marker.endereco}</div>
+            </div>
+            <div>
+              <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '2px' }}>📞 TELEFONE</div>
+              <div style={{ fontSize: '12px' }}>{marker.telefone || 'Não informado'}</div>
+            </div>
+            <div>
+              <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '2px' }}>STATUS</div>
+              <div style={{ fontSize: '12px' }}>{marker.status}</div>
+            </div>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
+// Dados simulados para gráficos
 const pieData = [
   { name: "Manutenção", value: 420 },
   { name: "Instalação", value: 380 },
@@ -64,244 +124,243 @@ const satisfacaoData = [
   { name: "Jun", satisfacao: 98 },
 ];
 
-// Dados de técnicos (funcionários)
-const initialTecnicos = [
-  { id: 1, nome: "João Silva", cargo: "Técnico Sênior", lat: -23.5505, lng: -46.6333, tarefas: 12, veiculo: "Ford Ka - ABC-1234", status: "Em atendimento", cliente: "Empresa ABC", foto: "https://randomuser.me/api/portraits/men/32.jpg" },
-  { id: 2, nome: "Maria Oliveira", cargo: "Técnica Pleno", lat: -23.5485, lng: -46.6383, tarefas: 18, veiculo: "Honda CG - XYZ-9876", status: "Em deslocamento", cliente: "Empresa XYZ", foto: "https://randomuser.me/api/portraits/women/44.jpg" },
-  { id: 3, nome: "Carlos Santos", cargo: "Técnico Sênior", lat: -23.5520, lng: -46.6300, tarefas: 22, veiculo: "Fiat Uno - DEF-5678", status: "Em atendimento", cliente: "Empresa 123", foto: "https://randomuser.me/api/portraits/men/22.jpg" },
-  { id: 4, nome: "Ana Pereira", cargo: "Técnica Júnior", lat: -23.5550, lng: -46.6400, tarefas: 9, veiculo: "Yamaha Factor - QWE-4321", status: "Disponível", cliente: "", foto: "https://randomuser.me/api/portraits/women/28.jpg" },
-  { id: 5, nome: "Roberto Alves", cargo: "Técnico Pleno", lat: -23.5600, lng: -46.6350, tarefas: 15, veiculo: "VW Gol - GHI-7890", status: "Em deslocamento", cliente: "Empresa DEF", foto: "https://randomuser.me/api/portraits/men/45.jpg" },
-  { id: 6, nome: "Juliana Costa", cargo: "Técnica Sênior", lat: -23.5450, lng: -46.6280, tarefas: 20, veiculo: "Chevrolet Onix - JKL-1234", status: "Em atendimento", cliente: "Empresa GHI", foto: "https://randomuser.me/api/portraits/women/15.jpg" },
-];
+// Componente do Mapa - Mostra Ordens de Serviço em Tempo Real
+const ServiceOrderMap = ({ ordensServico, theme, companyCnpj, setOrdensServico }) => {
+  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroPrioridade, setFiltroPrioridade] = useState("");
+  const [filtroResponsavel, setFiltroResponsavel] = useState("");
 
-// Dados de clientes
-const initialClientes = [
-  { id: 1, nome: "Empresa ABC", lat: -23.5515, lng: -46.6343, tipo: "cliente", endereco: "Av. Paulista, 1000", telefone: "(11) 3456-7890" },
-  { id: 2, nome: "Empresa XYZ", lat: -23.5475, lng: -46.6373, tipo: "cliente", endereco: "Rua Augusta, 500", telefone: "(11) 2345-6789" },
-  { id: 3, nome: "Empresa 123", lat: -23.5530, lng: -46.6310, tipo: "cliente", endereco: "Av. Rebouças, 750", telefone: "(11) 3456-7890" },
-  { id: 4, nome: "Empresa DEF", lat: -23.5610, lng: -46.6360, tipo: "cliente", endereco: "Rua Oscar Freire, 200", telefone: "(11) 4567-8901" },
-  { id: 5, nome: "Empresa GHI", lat: -23.5440, lng: -46.6270, tipo: "cliente", endereco: "Av. Brigadeiro Faria Lima, 3500", telefone: "(11) 5678-9012" },
-];
+  // Filtrar ordens de serviço
+  const ordensFiltradas = useMemo(() => {
+    return (ordensServico || []).filter(os => {
+      const matchStatus = !filtroStatus || os.status === filtroStatus;
+      const matchPrioridade = !filtroPrioridade || os.prioridade === filtroPrioridade;
+      const matchResponsavel = !filtroResponsavel || os.responsavel === filtroResponsavel;
+      return matchStatus && matchPrioridade && matchResponsavel;
+    });
+  }, [ordensServico, filtroStatus, filtroPrioridade, filtroResponsavel]);
 
-// Componente do Mapa
-const TechnicianMap = ({ tecnicos, clientes, showDensity, theme }) => {
-  const [carIcon, setCarIcon] = useState(null);
-  const [clientIcon, setClientIcon] = useState(null);
-  
-  useEffect(() => {
-    // Criar ícones personalizados quando o componente montar
-    setCarIcon(createCustomIcon(carIconUrl, [32, 32], 'car-icon'));
-    setClientIcon(createCustomIcon(personIconUrl, [40, 40], 'client-icon-highlighted'));
-  }, []);
-  
-  if (!carIcon || !clientIcon) {
-    return (
-      <div style={{ 
-        height: 500, 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center", 
-        backgroundColor: theme.bg,
-        borderRadius: "8px"
-      }}>
-        <div style={{ textAlign: "center" }}>
-          <div className="loading-spinner"></div>
-          <p>Carregando mapa...</p>
-        </div>
-      </div>
-    );
-  }
-  
+  // Obter lista única de responsáveis
+  const responsaveis = useMemo(() => {
+    const set = new Set((ordensServico || []).map(os => os.responsavel).filter(Boolean));
+    return Array.from(set);
+  }, [ordensServico]);
+
+  const markers = useMemo(() => {
+    if (!ordensFiltradas || ordensFiltradas.length === 0) return [];
+    
+    return ordensFiltradas
+      .filter(ox => ox.latitude && ox.longitude)
+      .map(ox => {
+        const lat = parseFloat(ox.latitude);
+        const lng = parseFloat(ox.longitude);
+        
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          return null;
+        }
+        
+        return {
+          id: ox.id, 
+          nome: ox.cliente, 
+          lat: lat, 
+          lng: lng, 
+          telefone: ox.telefone,
+          endereco: `${ox.endereco}, ${ox.numero}`,
+          status: ox.status,
+          prioridade: ox.prioridade,
+          cep: ox.cep,
+          cidade: ox.cidade,
+          estado: ox.estado,
+          responsavel: ox.responsavel
+        };
+      })
+      .filter(Boolean);
+  }, [ordensFiltradas]);
+
   return (
-    <div style={{ height: 500, position: "relative" }}>
+    <div style={{ height: 650, position: 'relative', background: theme.cardBg, borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* Filtros do Mapa */}
       <div style={{ 
-        position: "absolute", 
-        right: 10, 
-        top: 10, 
-        zIndex: 1000, 
+        padding: '12px 16px', 
         background: theme.cardBg, 
-        padding: "8px 12px", 
-        borderRadius: 8,
-        boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px"
+        borderBottom: `1px solid ${theme.border}`,
+        display: 'flex',
+        gap: '12px',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        zIndex: 999
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ 
-              width: "16px", 
-              height: "16px", 
-              backgroundImage: `url(${carIconUrl})`,
-              backgroundSize: "contain",
-              backgroundRepeat: "no-repeat"
-            }}></div>
-            <span style={{ fontSize: "13px" }}>Técnicos</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ 
-              width: "16px", 
-              height: "16px", 
-              backgroundImage: `url(${personIconUrl})`,
-              backgroundSize: "contain",
-              backgroundRepeat: "no-repeat"
-            }}></div>
-            <span style={{ fontSize: "13px" }}>Clientes</span>
-          </div>
+        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: theme.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Status:
+          <select 
+            value={filtroStatus} 
+            onChange={e => setFiltroStatus(e.target.value)}
+            style={{
+              background: theme.inputBg || theme.cardBg,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+              borderRadius: '4px',
+              padding: '6px 8px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="">Todos</option>
+            <option value="Pendente">Pendente</option>
+            <option value="Em andamento">Em andamento</option>
+            <option value="Concluída">Concluída</option>
+            <option value="Cancelada">Cancelada</option>
+            <option value="Aguardando Peça">Aguardando Peça</option>
+          </select>
+        </label>
+
+        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: theme.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Prioridade:
+          <select 
+            value={filtroPrioridade} 
+            onChange={e => setFiltroPrioridade(e.target.value)}
+            style={{
+              background: theme.inputBg || theme.cardBg,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+              borderRadius: '4px',
+              padding: '6px 8px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="">Todos</option>
+            <option value="Alta">Alta</option>
+            <option value="Média">Média</option>
+            <option value="Baixa">Baixa</option>
+          </select>
+        </label>
+
+        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: theme.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Responsável:
+          <select 
+            value={filtroResponsavel} 
+            onChange={e => setFiltroResponsavel(e.target.value)}
+            style={{
+              background: theme.inputBg || theme.cardBg,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+              borderRadius: '4px',
+              padding: '6px 8px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="">Todos</option>
+            {responsaveis.map(r => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          onClick={async () => {
+            const ordensComErro = ordensServico.filter(os => !os.latitude || !os.longitude);
+            
+            if (ordensComErro.length === 0) {
+              alert('✅ Todas as ordens já têm coordenadas!');
+              return;
+            }
+            
+            let sucessos = 0;
+            let erros = 0;
+            
+            for (const os of ordensComErro) {
+              try {
+                const endereco = `${os.endereco}, ${os.numero}, ${os.cidade}, ${os.estado}`;
+                const response = await fetch(
+                  `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(endereco)}`
+                );
+                const results = await response.json();
+                
+                if (results.length > 0) {
+                  const lat = parseFloat(results[0].lat);
+                  const lon = parseFloat(results[0].lon);
+                  
+                  await firebase.updateServiceOrder(companyCnpj, os.id, {
+                    latitude: lat,
+                    longitude: lon
+                  });
+                  
+                  sucessos++;
+                } else {
+                  erros++;
+                }
+              } catch (err) {
+                erros++;
+              }
+              
+              await new Promise(r => setTimeout(r, 1000));
+            }
+            
+            const list = await firebase.listServiceOrders(companyCnpj);
+            const comCoordenadas = list.filter(os => os.latitude && os.longitude);
+            setOrdensServico(comCoordenadas);
+            alert(`✅ Geocoding concluído!\n✅ Sucessos: ${sucessos}\n❌ Erros: ${erros}`);
+          }}
+          style={{
+            background: theme.highlight,
+            color: 'white',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            transition: 'all 0.2s ease'
+          }}
+        >
+          📍 Localizar Ordens ({ordensServico.filter(os => !os.latitude || !os.longitude).length})
+        </button>
+
+        <div style={{ marginLeft: 'auto', fontSize: '0.85rem', color: theme.subtext, fontWeight: 600 }}>
+          {markers.length} ordem(ns) no mapa
         </div>
       </div>
-      
-      <MapContainer center={[-23.5505, -46.6333]} zoom={14} style={{ height: "100%", width: "100%", borderRadius: "8px" }}>
-        <TileLayer
-          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        {/* Marcadores de técnicos (carros) */}
-        {tecnicos.map((t) => (
-          <Marker
-            key={`tecnico-${t.id}`}
-            position={[t.lat, t.lng]}
-            icon={carIcon}
+
+      {/* Mapa com Leaflet */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {markers.length > 0 ? (
+          <MapContainer 
+            center={[-23.5505, -46.6333]} 
+            zoom={14} 
+            style={{ height: '100%', width: '100%' }}
           >
-            <Popup className="custom-popup">
-              <div style={{ padding: "4px", minWidth: "200px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                  <img 
-                    src={t.foto} 
-                    alt={t.nome} 
-                    style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} 
-                  />
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: "16px" }}>{t.nome}</h3>
-                    <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>{t.cargo}</p>
-                  </div>
-                </div>
-                <div style={{ fontSize: "13px" }}>
-                  <p style={{ margin: "4px 0" }}><strong>Status:</strong> <span style={{ 
-                    color: t.status === "Em atendimento" ? "#10b981" : t.status === "Em deslocamento" ? "#f59e0b" : "#3b82f6",
-                    fontWeight: 500
-                  }}>{t.status}</span></p>
-                  <p style={{ margin: "4px 0" }}><strong>Veículo:</strong> {t.veiculo}</p>
-                  <p style={{ margin: "4px 0" }}><strong>Tarefas concluídas:</strong> {t.tarefas}</p>
-                  {t.cliente && <p style={{ margin: "4px 0" }}><strong>Cliente atual:</strong> {t.cliente}</p>}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-        
-        {/* Marcadores de clientes (pessoas destacadas) */}
-        {clientes.map((c) => (
-          <Marker
-            key={`cliente-${c.id}`}
-            position={[c.lat, c.lng]}
-            icon={clientIcon}
-            zIndexOffset={1000} // Garante que os clientes fiquem acima dos técnicos
-          >
-            <Popup className="custom-popup client-popup">
-              <div style={{ padding: "4px", minWidth: "200px" }}>
-                <div style={{ 
-                  backgroundColor: "#8b5cf6", 
-                  padding: "10px", 
-                  margin: "-12px -12px 10px -12px", 
-                  borderRadius: "4px 4px 0 0",
-                  color: "white"
-                }}>
-                  <h3 style={{ margin: 0, fontSize: "16px" }}>{c.nome}</h3>
-                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", opacity: 0.9 }}>Cliente</p>
-                </div>
-                <div style={{ fontSize: "13px" }}>
-                  <p style={{ margin: "4px 0" }}><strong>Endereço:</strong> {c.endereco}</p>
-                  <p style={{ margin: "4px 0" }}><strong>Telefone:</strong> {c.telefone}</p>
-                </div>
-                <div style={{ 
-                  display: "flex", 
-                  gap: "8px", 
-                  marginTop: "10px" 
-                }}>
-                  <button style={{
-                    backgroundColor: "#8b5cf6",
-                    color: "white",
-                    border: "none",
-                    padding: "6px 12px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    cursor: "pointer"
-                  }}>
-                    Ver Detalhes
-                  </button>
-                  <button style={{
-                    backgroundColor: "#f1f5f9",
-                    color: "#334155",
-                    border: "none",
-                    padding: "6px 12px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    cursor: "pointer"
-                  }}>
-                    Criar OS
-                  </button>
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-        
-        {/* Círculos de densidade (opcional) */}
-        {showDensity && tecnicos.map((t) => (
-          <div 
-            key={`density-${t.id}`}
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              width: t.tarefas * 4,
-              height: t.tarefas * 4,
-              borderRadius: "50%",
-              backgroundColor: t.status === "Em atendimento" ? "rgba(16, 185, 129, 0.15)" : 
-                              t.status === "Em deslocamento" ? "rgba(245, 158, 11, 0.15)" : 
-                              "rgba(59, 130, 246, 0.15)",
-              transform: `translate(${t.lat}px, ${t.lng}px)`,
-              transition: "all 0.5s ease"
-            }}
-          />
-        ))}
-      </MapContainer>
-      
-      {/* Adicione CSS para estilizar os ícones */}
-      <style jsx>{`
-        .car-icon {
-          filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
-        }
-        
-        .client-icon-highlighted {
-          filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.8));
-          transform: scale(1.1);
-        }
-        
-        .custom-popup .leaflet-popup-content-wrapper {
-          border-radius: 8px;
-          box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
-        }
-        
-        .client-popup .leaflet-popup-content-wrapper {
-          border: 2px solid #8b5cf6;
-        }
-        
-        .loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid rgba(0, 0, 0, 0.1);
-          border-radius: 50%;
-          border-top: 4px solid #3b82f6;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 16px;
-        }
-        
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png"
+              attribution='&copy; OpenStreetMap contributors'
+              maxZoom={19}
+            />
+            
+            {markers.map(m => (
+              <OrderMarker key={m.id} marker={m} theme={theme} />
+            ))}
+            
+            <MapController markers={markers} />
+          </MapContainer>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: theme.subtext, fontSize: '16px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📍</div>
+              <div>Nenhuma ordem de serviço encontrada com os filtros selecionados</div>
+              <div style={{ fontSize: '12px', marginTop: '8px' }}>Ajuste os filtros ou crie novas ordens</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 4px 12px currentColor; }
+          50% { box-shadow: 0 4px 20px currentColor; }
         }
       `}</style>
     </div>
@@ -310,24 +369,62 @@ const TechnicianMap = ({ tecnicos, clientes, showDensity, theme }) => {
 
 // Componente principal
 export default function Dashboard() {
-  const [tecnicos, setTecnicos] = useState(initialTecnicos);
-  const [clientes] = useState(initialClientes);
-  const [showDensity, setShowDensity] = useState(true);
+  const [ordensServico, setOrdensServico] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [currentDate] = useState(new Date());
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [avaliacoes, setAvaliacoes] = useState([]);
+  const companyCnpj = localStorage.getItem("companyCnpj") || "";
 
-  // Movimento aleatório dos técnicos para simular deslocamento
+  // Carregar Ordens de Serviço do Firebase
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTecnicos(prev => prev.map(t => ({
-        ...t,
-        lat: t.lat + (Math.random() - 0.5) * 0.002,
-        lng: t.lng + (Math.random() - 0.5) * 0.002,
-        tarefas: Math.max(5, Math.min(30, t.tarefas + Math.floor(Math.random() * 3) - 1))
-      })));
-    }, 5000);
+    async function loadOrdensServico() {
+      if (!companyCnpj) return;
+      try {
+        const list = await firebase.listServiceOrders(companyCnpj);
+        console.log('📋 Ordens carregadas:', list.length);
+        
+        // Verificar quais têm coordenadas
+        const comCoordenadas = list.filter(os => os.latitude && os.longitude);
+        const semCoordenadas = list.filter(os => !os.latitude || !os.longitude);
+        
+        console.log(`✅ Com coordenadas: ${comCoordenadas.length}`);
+        console.log(`❌ Sem coordenadas: ${semCoordenadas.length}`);
+        
+        if (semCoordenadas.length > 0) {
+          console.log('Ordens sem coordenadas:', semCoordenadas.map(os => ({ id: os.id, cliente: os.cliente, endereco: os.endereco })));
+        }
+        
+        setOrdensServico(comCoordenadas);
+      } catch (err) {
+        console.error('Erro ao carregar ordens de serviço:', err);
+      }
+    }
+    loadOrdensServico();
+    
+    // Recarregar a cada 10 segundos para pegar novas OS
+    const interval = setInterval(loadOrdensServico, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [companyCnpj]);
+
+  // Carregar avaliações de satisfação
+  useEffect(() => {
+    async function loadAvaliacoes() {
+      if (!companyCnpj) return;
+      try {
+        const ratings = await firebase.getSatisfactionRatings(companyCnpj);
+        console.log('⭐ Avaliações carregadas:', ratings.length);
+        setAvaliacoes(ratings);
+      } catch (err) {
+        console.error('Erro ao carregar avaliações:', err);
+      }
+    }
+    loadAvaliacoes();
+    
+    // Recarregar a cada 10 segundos para pegar novas avaliações
+    const interval = setInterval(loadAvaliacoes, 10000);
+    return () => clearInterval(interval);
+  }, [companyCnpj]);
 
   // Estilo baseado no modo (claro/escuro)
   const theme = darkMode ? {
@@ -404,35 +501,35 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Cards de métricas */}
+      {/* Cards de métricas baseadas em Ordens de Serviço */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 24, marginBottom: 24 }}>
         <MetricCard 
           icon={<FiUsers size={24} />}
-          title="Técnicos Ativos"
-          value={tecnicos.length}
-          change="+2"
+          title="Prestadores Ativos"
+          value={new Set(ordensServico.map(os => os.responsavel)).size}
+          change={ordensServico.length > 0 ? "+" + ordensServico.length : "0"}
           theme={theme}
         />
         <MetricCard 
           icon={<FiTruck size={24} />}
-          title="Atendimentos Hoje"
-          value={Math.floor(tecnicos.reduce((sum, t) => sum + t.tarefas, 0) * 0.65)}
-          change="+12%"
+          title="Ordens Totais"
+          value={ordensServico.length}
+          change={ordensServico.filter(os => os.status === 'Em andamento').length + " em progresso"}
           theme={theme}
         />
         <MetricCard 
           icon={<FiAlertCircle size={24} />}
-          title="Chamados Pendentes"
-          value={Math.floor(tecnicos.reduce((sum, t) => sum + t.tarefas, 0) * 0.35)}
+          title="Ordens Pendentes"
+          value={ordensServico.filter(os => os.status === 'Pendente').length}
           change="-5%"
           theme={theme}
           isNegative={false}
         />
         <MetricCard 
           icon={<FiActivity size={24} />}
-          title="Tempo Médio"
-          value="45 min"
-          change="-8%"
+          title="Conclusão Taxa"
+          value={ordensServico.length > 0 ? Math.round((ordensServico.filter(os => os.status === 'Concluída').length / ordensServico.length) * 100) + "%" : "0%"}
+          change="+8%"
           theme={theme}
           isNegative={false}
         />
@@ -440,45 +537,42 @@ export default function Dashboard() {
 
       {/* Gráficos e mapa */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 24 }}>
-        {/* Mapa de localização em tempo real */}
-        <Card title="Localização em Tempo Real" icon={<FiMap />} gridSpan={8} theme={theme}>
-          <TechnicianMap 
-            tecnicos={tecnicos} 
-            clientes={clientes} 
-            showDensity={showDensity} 
-            theme={theme} 
+        {/* Mapa de Ordens de Serviço */}
+        <Card title="Ordens de Serviço no Mapa" icon={<FiMap />} gridSpan={8} theme={theme}>
+          <ServiceOrderMap 
+            ordensServico={ordensServico}
+            theme={theme}
+            companyCnpj={companyCnpj}
+            setOrdensServico={setOrdensServico}
           />
         </Card>
 
         {/* Seção lateral */}
         <div style={{ display: "flex", flexDirection: "column", gap: 24, gridColumn: "span 4" }}>
-          {/* Técnico destaque */}
-          <Card title="Técnico Destaque" icon={<FiUsers />} theme={theme}>
-            {/* Encontrando o técnico com mais tarefas */}
+          {/* Ordem de Serviço Destaque */}
+          <Card title="Última Ordem de Serviço" icon={<FiMapPin />} theme={theme}>
+            {/* Mostrando a ordem mais recente */}
             {(() => {
-              const tecnicoMaisAtivo = tecnicos.reduce((a, b) => (a.tarefas > b.tarefas ? a : b));
+              const ultimaOS = ordensServico.length > 0 ? ordensServico[ordensServico.length - 1] : null;
+              if (!ultimaOS) {
+                return <div style={{ color: theme.subtext, textAlign: "center", padding: "20px" }}>Nenhuma ordem de serviço cadastrada</div>;
+              }
+              const prioridadeCor = ultimaOS.prioridade === 'Alta' ? '#ef4444' : ultimaOS.prioridade === 'Média' ? '#f59e0b' : '#10b981';
               return (
                 <>
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
-                    <img 
-                      src={tecnicoMaisAtivo.foto} 
-                      alt={tecnicoMaisAtivo.nome} 
-                      style={{ width: "64px", height: "64px", borderRadius: "50%", objectFit: "cover" }} 
-                    />
-                    <div>
-                      <h3 style={{ margin: "0 0 4px 0", fontSize: "18px" }}>{tecnicoMaisAtivo.nome}</h3>
-                      <p style={{ margin: 0, color: theme.subtext }}>{tecnicoMaisAtivo.cargo}</p>
-                      <div style={{ 
-                        display: "inline-block", 
-                        background: "#10b981", 
-                        color: "white", 
-                        padding: "2px 8px", 
-                        borderRadius: "12px", 
-                        fontSize: "12px",
-                        marginTop: "6px" 
-                      }}>
-                        {tecnicoMaisAtivo.status}
-                      </div>
+                  <div style={{ marginBottom: "16px" }}>
+                    <h3 style={{ margin: "0 0 8px 0", fontSize: "18px" }}>{ultimaOS.cliente}</h3>
+                    <p style={{ margin: 0, color: theme.subtext, fontSize: "13px" }}>{ultimaOS.endereco}, {ultimaOS.numero}</p>
+                    <div style={{ 
+                      display: "inline-block", 
+                      background: prioridadeCor, 
+                      color: "white", 
+                      padding: "4px 12px", 
+                      borderRadius: "12px", 
+                      fontSize: "12px",
+                      marginTop: "8px" 
+                    }}>
+                      Prioridade: {ultimaOS.prioridade}
                     </div>
                   </div>
                   <div style={{ 
@@ -490,12 +584,12 @@ export default function Dashboard() {
                     borderRadius: "8px"
                   }}>
                     <div>
-                      <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Tarefas Concluídas</p>
-                      <p style={{ margin: 0, fontSize: "20px", fontWeight: 600 }}>{tecnicoMaisAtivo.tarefas}</p>
+                      <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Status</p>
+                      <p style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>{ultimaOS.status}</p>
                     </div>
                     <div>
-                      <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Cliente Atual</p>
-                      <p style={{ margin: 0, fontSize: "14px" }}>{tecnicoMaisAtivo.cliente || "Disponível"}</p>
+                      <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Responsável</p>
+                      <p style={{ margin: 0, fontSize: "14px" }}>{ultimaOS.responsavel || "Não atribuído"}</p>
                     </div>
                   </div>
                 </>
@@ -503,10 +597,36 @@ export default function Dashboard() {
             })()}
           </Card>
 
-          {/* Satisfação do cliente */}
+          {/* Satisfação do cliente - Gráfico */}
           <Card title="Satisfação do Cliente" icon={<FiActivity />} theme={theme}>
             <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={satisfacaoData}>
+              <AreaChart data={useMemo(() => {
+                // Agrupar avaliações por dia do mês atual
+                const now = new Date();
+                const mesAtual = now.getMonth() + 1;
+                const anoAtual = now.getFullYear();
+                
+                const avaliacoesMes = (avaliacoes || []).filter(a => a.mes === mesAtual && a.ano === anoAtual);
+                
+                // Criar array com 30 dias
+                const dados = [];
+                for (let dia = 1; dia <= 30; dia++) {
+                  const notas = avaliacoesMes.filter(a => {
+                    const data = new Date(a.data);
+                    return data.getDate() === dia;
+                  }).map(a => a.nota);
+                  
+                  const media = notas.length > 0 ? (notas.reduce((a, b) => a + b, 0) / notas.length) * 10 : 0;
+                  
+                  dados.push({
+                    name: `Dia ${dia}`,
+                    satisfacao: parseFloat(media.toFixed(1))
+                  });
+                }
+                
+                // Retornar apenas os primeiros 15 dias para visibilidade
+                return dados.slice(0, 15);
+              }, [avaliacoes])}>
                 <defs>
                   <linearGradient id="colorSatisfacao" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
@@ -515,8 +635,8 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
                 <XAxis dataKey="name" stroke={theme.subtext} />
-                <YAxis domain={[80, 100]} stroke={theme.subtext} />
-                <Tooltip contentStyle={{ backgroundColor: theme.cardBg, borderColor: theme.border, color: theme.text }} />
+                <YAxis domain={[0, 10]} stroke={theme.subtext} />
+                <Tooltip contentStyle={{ backgroundColor: theme.cardBg, borderColor: theme.border, color: theme.text }} formatter={(value) => `${value}/10`} />
                 <Area 
                   type="monotone" 
                   dataKey="satisfacao" 
@@ -537,19 +657,98 @@ export default function Dashboard() {
               borderRadius: "8px"
             }}>
               <div style={{ textAlign: "center" }}>
-                <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Média de Satisfação</p>
-                <p style={{ margin: 0, fontSize: "24px", fontWeight: 600, color: "#10b981" }}>94%</p>
+                <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Média de Satisfação (Este Mês)</p>
+                <p style={{ margin: 0, fontSize: "24px", fontWeight: 600, color: "#10b981" }}>
+                  {useMemo(() => {
+                    const now = new Date();
+                    const mesAtual = now.getMonth() + 1;
+                    const anoAtual = now.getFullYear();
+                    const avaliacoesMes = (avaliacoes || []).filter(a => a.mes === mesAtual && a.ano === anoAtual);
+                    
+                    if (avaliacoesMes.length === 0) return '0/10';
+                    
+                    const media = avaliacoesMes.reduce((acc, a) => acc + (a.nota || 0), 0) / avaliacoesMes.length;
+                    return `${media.toFixed(1)}/10`;
+                  }, [avaliacoes])}
+                </p>
               </div>
             </div>
           </Card>
-        </div>
 
+          {/* Solicitar Avaliação - Enviar pergunta ao cliente */}
+          <Card title="Solicitar Avaliação de Satisfação" icon={<FiActivity />} theme={theme}>
+            {(() => {
+              const ultimaOS = ordensServico.length > 0 ? ordensServico[ordensServico.length - 1] : null;
+              if (!ultimaOS) {
+                return <div style={{ color: theme.subtext, textAlign: "center", padding: "20px" }}>Nenhuma ordem de serviço para avaliar</div>;
+              }
+              
+              return (
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ padding: '12px', background: darkMode ? "#0f172a" : "#f8fafc", borderRadius: '8px', marginBottom: '8px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: theme.subtext }}>Solicitando avaliação para:</p>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: theme.text }}>{ultimaOS.cliente}</p>
+                  </div>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!ultimaOS.telefone) {
+                        alert('❌ Telefone do cliente não informado');
+                        return;
+                      }
+                      
+                      try {
+                        const mensagem = `Vc esta satisfeito com o serviço? Entre 0 a 10 qual o nivel que vc nos da por favor?\n\nOrdem de Serviço: #${ultimaOS.id}\nCliente: ${ultimaOS.cliente}`;
+                        
+                        await firebase.sendWhatsAppMessage(
+                          companyCnpj,
+                          ultimaOS.telefone,
+                          mensagem
+                        );
+                        alert('✅ Pergunta de satisfação enviada com sucesso!');
+                      } catch (err) {
+                        alert(`❌ Erro ao enviar: ${err.message}`);
+                      }
+                    }}
+                    style={{
+                      padding: '14px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'center'
+                    }}
+                    onMouseOver={e => e.target.style.opacity = '0.8'}
+                    onMouseOut={e => e.target.style.opacity = '1'}
+                  >
+                    📱 Solicitar Avaliação via WhatsApp (0-10)
+                  </button>
+                </div>
+              );
+            })()}
+          </Card>
+        </div>
+      </div>
+
+      {/* Gráficos de análise */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 24 }}>
         {/* Distribuição de serviços */}
         <Card title="Distribuição de Serviços" icon={<FiPieChart />} gridSpan={4} theme={theme}>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie 
-                data={pieData} 
+                data={useMemo(() => {
+                  const distribuicao = {};
+                  (ordensServico || []).forEach(os => {
+                    const tipo = os.tipo || 'Outro';
+                    distribuicao[tipo] = (distribuicao[tipo] || 0) + 1;
+                  });
+                  return Object.entries(distribuicao).map(([name, value]) => ({ name, value }));
+                }, [ordensServico])} 
                 dataKey="value" 
                 nameKey="name" 
                 cx="50%" 
@@ -560,8 +759,8 @@ export default function Dashboard() {
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
               >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                {COLORS.map((color, index) => (
+                  <Cell key={`cell-${index}`} fill={color} />
                 ))}
               </Pie>
               <Tooltip contentStyle={{ backgroundColor: theme.cardBg, borderColor: theme.border, color: theme.text }} />
@@ -572,7 +771,19 @@ export default function Dashboard() {
         {/* Crescimento de serviços */}
         <Card title="Crescimento de Serviços" icon={<FiBarChart2 />} gridSpan={4} theme={theme}>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={growthData}>
+            <LineChart data={useMemo(() => {
+              const counts = {};
+              (ordensServico || []).forEach(os => {
+                const status = os.status || 'Pendente';
+                counts[status] = (counts[status] || 0) + 1;
+              });
+              
+              return [
+                { name: 'Janeiro', servicos: Math.floor((ordensServico.length || 0) * 0.3), meta: Math.floor((ordensServico.length || 0) * 0.35) },
+                { name: 'Fevereiro', servicos: Math.floor((ordensServico.length || 0) * 0.4), meta: Math.floor((ordensServico.length || 0) * 0.4) },
+                { name: 'Março', servicos: Math.floor((ordensServico.length || 0) * 0.5), meta: Math.floor((ordensServico.length || 0) * 0.45) },
+              ];
+            }, [ordensServico])}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
               <XAxis dataKey="name" stroke={theme.subtext} />
               <YAxis stroke={theme.subtext} />
@@ -603,7 +814,32 @@ export default function Dashboard() {
                 {/* Desempenho financeiro */}
         <Card title="Desempenho Financeiro" icon={<FiCalendar />} gridSpan={4} theme={theme}>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={barData}>
+            <BarChart data={useMemo(() => {
+              const ordemsPendentes = (ordensServico || []).filter(os => os.status === 'Pendente').length;
+              const ordensAndamento = (ordensServico || []).filter(os => os.status === 'Em andamento').length;
+              const ordensCompletas = (ordensServico || []).filter(os => os.status === 'Concluída').length;
+              
+              return [
+                { 
+                  name: "Janeiro", 
+                  receita: Math.floor(ordensCompletas * 500 * 0.3), 
+                  despesas: Math.floor(ordensCompletas * 200 * 0.3), 
+                  lucro: Math.floor(ordensCompletas * 300 * 0.3) 
+                },
+                { 
+                  name: "Fevereiro", 
+                  receita: Math.floor(ordensCompletas * 500 * 0.4), 
+                  despesas: Math.floor(ordensCompletas * 200 * 0.4), 
+                  lucro: Math.floor(ordensCompletas * 300 * 0.4) 
+                },
+                { 
+                  name: "Março", 
+                  receita: Math.floor(ordensCompletas * 500 * 0.5), 
+                  despesas: Math.floor(ordensCompletas * 200 * 0.5), 
+                  lucro: Math.floor(ordensCompletas * 300 * 0.5) 
+                },
+              ];
+            }, [ordensServico])}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
               <XAxis dataKey="name" stroke={theme.subtext} />
               <YAxis stroke={theme.subtext} />

@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import * as api from '../../services/api';
+import firebaseService from '../../services/firebase';
+import { normalizeCnpj } from '../../utils/cnpj';
 
-// Dados fictícios para login
+const USE_FIREBASE = process.env.REACT_APP_USE_FIREBASE === 'true';
+
+// Dados fictícios para demonstração (fallback quando backend não estiver disponível)
 const MOCK_USERS = [
   { cnpj: "12.345.678/0001-90", usuario: "admin", senha: "admin123", nome: "Administrador" },
   { cnpj: "98.765.432/0001-10", usuario: "gerente", senha: "gerente123", nome: "Gerente" },
@@ -31,7 +36,8 @@ export default function Login({ recoveryMode = false }) {
     const savedLembrar = localStorage.getItem("savedLembrar") === "true";
     
     if (savedLembrar && savedCnpj && savedUsuario) {
-      setCnpj(savedCnpj);
+      // savedCnpj is stored normalized (digits only) — format it for display
+      setCnpj(formatarCNPJ(savedCnpj));
       setUsuario(savedUsuario);
       setLembrar(true);
       setLoginStage(2); // Ir direto para senha
@@ -144,21 +150,55 @@ export default function Login({ recoveryMode = false }) {
     e.preventDefault();
     
     if (loginStage === 0) {
-      // Validar CNPJ
-      const cnpjValido = MOCK_USERS.some(user => user.cnpj === cnpj);
-      if (!cnpjValido) {
-        setErro("CNPJ não encontrado. Verifique e tente novamente.");
-        return;
-      }
-      setLoginStage(1);
+      // Validar CNPJ via backend (com fallback ao mock)
+      setCarregando(true);
+      const normalized = normalizeCnpj(cnpj);
+      const call = USE_FIREBASE ? firebaseService.identifyCnpj(normalized) : api.identifyCnpj(normalized);
+      Promise.resolve(call)
+        .then((res) => {
+          // espera-se { exists: true } ou detalhes da empresa
+          if (res && (res.exists === true || res.company)) {
+            setErro("");
+            setLoginStage(1);
+          } else {
+            setErro("CNPJ não encontrado. Verifique e tente novamente.");
+          }
+        })
+        .catch(() => {
+          // Fallback local (compare normalized values)
+          const cnpjValido = MOCK_USERS.some(user => normalizeCnpj(user.cnpj) === normalizeCnpj(cnpj));
+          if (cnpjValido) {
+            setErro("");
+            setLoginStage(1);
+          } else {
+            setErro("CNPJ não encontrado. Verifique e tente novamente.");
+          }
+        })
+        .finally(() => setCarregando(false));
     } else if (loginStage === 1) {
-      // Validar usuário
-      const usuarioValido = MOCK_USERS.some(user => user.cnpj === cnpj && user.usuario === usuario);
-      if (!usuarioValido) {
-        setErro("Usuário não encontrado para este CNPJ.");
-        return;
-      }
-      setLoginStage(2);
+      // Validar usuário para o CNPJ via backend (com fallback ao mock)
+      setCarregando(true);
+      const normalized = normalizeCnpj(cnpj);
+      const call = USE_FIREBASE ? firebaseService.checkUser(normalized, usuario) : api.checkUser(normalized, usuario);
+      Promise.resolve(call)
+        .then((res) => {
+          if (res && (res.exists === true || res.user)) {
+            setErro("");
+            setLoginStage(2);
+          } else {
+            setErro("Usuário não encontrado para este CNPJ.");
+          }
+        })
+        .catch(() => {
+          const usuarioValido = MOCK_USERS.some(user => normalizeCnpj(user.cnpj) === normalizeCnpj(cnpj) && user.usuario === usuario);
+          if (usuarioValido) {
+            setErro("");
+            setLoginStage(2);
+          } else {
+            setErro("Usuário não encontrado para este CNPJ.");
+          }
+        })
+        .finally(() => setCarregando(false));
     }
   };
 
@@ -171,51 +211,110 @@ export default function Login({ recoveryMode = false }) {
     e.preventDefault();
     setErro("");
     setCarregando(true);
-    
-    // Simulação de requisição ao servidor
-    setTimeout(() => {
-      const usuarioEncontrado = MOCK_USERS.find(
-        user => user.cnpj === cnpj && user.usuario === usuario && user.senha === senha
-      );
-      
-      if (usuarioEncontrado) {
-        // Salvar credenciais se "lembrar" estiver marcado
-        if (lembrar) {
-          localStorage.setItem("savedCnpj", cnpj);
-          localStorage.setItem("savedUsuario", usuario);
-          localStorage.setItem("savedLembrar", "true");
+    // Chamar backend (ou Firebase) para autenticar (com fallback ao mock)
+    const call = USE_FIREBASE ? firebaseService.login({ cnpj, usuario, senha }) : api.login({ cnpj, usuario, senha });
+    Promise.resolve(call)
+      .then((res) => {
+        // espera-se { token, userName, company }
+        if (res && res.token) {
+          const normalized = normalizeCnpj(cnpj);
+          if (lembrar) {
+            localStorage.setItem("savedCnpj", normalized);
+            localStorage.setItem("savedUsuario", usuario);
+            localStorage.setItem("savedLembrar", "true");
+          } else {
+            localStorage.removeItem("savedCnpj");
+            localStorage.removeItem("savedUsuario");
+            localStorage.removeItem("savedLembrar");
+          }
+
+          localStorage.setItem("authToken", res.token);
+          if (res.userName) localStorage.setItem("userName", res.userName);
+          // save a sensible companyCnpj normalized so other parts of the app can read it
+          if (res.company && res.company.cnpj) {
+            localStorage.setItem("companyCnpj", normalizeCnpj(res.company.cnpj));
+          } else {
+            // ensure we save the normalized cnpj typed by user (fallback)
+            localStorage.setItem("companyCnpj", normalized);
+          }
+          // Try to save an email if backend returned one
+          if (res.user && res.user.email) {
+            localStorage.setItem("userEmail", res.user.email);
+          } else if (res.userEmail) {
+            localStorage.setItem("userEmail", res.userEmail);
+          } else {
+            // synthetic fallback email for display
+            localStorage.setItem("userEmail", `${usuario}@${normalizeCnpj(cnpj)}.local`);
+          }
+
+          // Attempt to fetch the user profile (role and displayName) so the dashboard shows correct name
+          const profileCall = api.checkUser(normalized, usuario);
+          Promise.resolve(profileCall)
+            .then(profileRes => {
+              const role = (profileRes && profileRes.user && profileRes.user.role) ? profileRes.user.role : 'user';
+              const displayName = (profileRes && profileRes.user && profileRes.user.displayName) ? profileRes.user.displayName : usuario;
+              localStorage.setItem('userRole', role);
+              // Override userName with the correct displayName from profile
+              localStorage.setItem('userName', displayName);
+            })
+            .catch(() => {
+              // If profile fetch fails, fallback to demo account roles
+              const demoRole = usuario === 'admin' ? 'admin' : (usuario === 'gerente' ? 'gerente' : 'user');
+              localStorage.setItem('userRole', demoRole);
+            })
+            .finally(() => {
+              setLoginStage(3);
+              setTimeout(() => navigate("/dashboard"), 800);
+            });
         } else {
-          localStorage.removeItem("savedCnpj");
-          localStorage.removeItem("savedUsuario");
-          localStorage.removeItem("savedLembrar");
+          setErro((res && res.message) || "Credenciais inválidas. Tente novamente.");
         }
+      })
+        .catch(() => {
+        // Fallback local mock
+        const usuarioEncontrado = MOCK_USERS.find(
+          user => normalizeCnpj(user.cnpj) === normalizeCnpj(cnpj) && user.usuario === usuario && user.senha === senha
+        );
         
-        // Salvar token de autenticação
-        localStorage.setItem("authToken", "token-jwt-ficticio-" + Date.now());
-        localStorage.setItem("userName", usuarioEncontrado.nome);
-        
-        // Mostrar animação de sucesso antes de redirecionar
-        setLoginStage(3); // Estágio de sucesso
-        
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 1500);
-      } else {
-        setErro("Senha incorreta. Tente novamente.");
-        setCarregando(false);
-      }
-    }, 1000);
+        if (usuarioEncontrado) {
+          const normalized = normalizeCnpj(cnpj);
+          if (lembrar) {
+            localStorage.setItem("savedCnpj", normalized);
+            localStorage.setItem("savedUsuario", usuario);
+            localStorage.setItem("savedLembrar", "true");
+          } else {
+            localStorage.removeItem("savedCnpj");
+            localStorage.removeItem("savedUsuario");
+            localStorage.removeItem("savedLembrar");
+          }
+
+          localStorage.setItem("authToken", "token-jwt-ficticio-" + Date.now());
+          localStorage.setItem("userName", usuarioEncontrado.nome);
+          localStorage.setItem("companyCnpj", normalized);
+          localStorage.setItem("userEmail", `${usuario}@${normalized}.local`);
+          // Set a default role for demo accounts (admin for 'admin' user)
+          const demoRole = usuario === 'admin' ? 'admin' : (usuario === 'gerente' ? 'gerente' : 'user');
+          localStorage.setItem('userRole', demoRole);
+          setLoginStage(3);
+          setTimeout(() => navigate("/dashboard"), 800);
+        } else {
+          setErro("Senha incorreta. Tente novamente.");
+        }
+      })
+      .finally(() => setCarregando(false));
   };
 
   const handleRecuperarSenha = (e) => {
     e.preventDefault();
     setCarregando(true);
-    
-    // Simulação de envio de e-mail de recuperação
-    setTimeout(() => {
-      setRecuperacaoEnviada(true);
-      setCarregando(false);
-    }, 1500);
+    // Tenta chamar backend ou Firebase para recuperação
+    const call = USE_FIREBASE ? firebaseService.recoverPassword(emailRecuperacao, null) : api.recoverPassword(emailRecuperacao);
+    Promise.resolve(call)
+      .then(() => setRecuperacaoEnviada(true))
+      .catch(() => {
+        setRecuperacaoEnviada(true);
+      })
+      .finally(() => setCarregando(false));
   };
 
   const handleDemoAccountClick = (account) => {

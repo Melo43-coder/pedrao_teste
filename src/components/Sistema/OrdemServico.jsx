@@ -3,9 +3,10 @@ import {
   FiFileText, FiAlertTriangle, FiClock, FiCheckCircle, 
   FiXCircle, FiPlusCircle, FiFilter, FiEdit3, FiEye, 
   FiCheck, FiSearch, FiRefreshCw, FiCalendar, FiUser,
-  FiBarChart2, FiActivity
+  FiBarChart2, FiActivity, FiMapPin, FiPhone, FiMail
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import firebase from "../../services/firebase";
 
 // Dados de status e prioridades
 const OSSTATUS = [
@@ -22,76 +23,6 @@ const PRIORIDADES = [
   { nome: "Baixa", cor: "#10b981", bgColor: "#d1fae5" }
 ];
 
-// Dados mock
-const MOCK_OS = [
-  {
-    codigo: "#59427",
-    cliente: "Clínica Nova Vida",
-    abertura: "2025-05-10",
-    status: "Pendente",
-    prioridade: "Alta",
-    responsavel: "Alex Silva",
-    alerta: true,
-    descricao: "Manutenção no sistema de ar condicionado da sala de cirurgia",
-    ultimaAtualizacao: "2025-05-10T14:30:00"
-  },
-  {
-    codigo: "#58311",
-    cliente: "Colégio Ágape",
-    abertura: "2025-05-09",
-    status: "Em andamento",
-    prioridade: "Média",
-    responsavel: "Bruna Oliveira",
-    alerta: false,
-    descricao: "Instalação de projetores em 5 salas de aula",
-    ultimaAtualizacao: "2025-05-10T09:15:00"
-  },
-  {
-    codigo: "#57009",
-    cliente: "Plaza Tech",
-    abertura: "2025-05-06",
-    status: "Aguardando Peça",
-    prioridade: "Alta",
-    responsavel: "Fernanda Costa",
-    alerta: true,
-    descricao: "Reparo em servidor principal com falha de disco",
-    ultimaAtualizacao: "2025-05-08T16:45:00"
-  },
-  {
-    codigo: "#56122",
-    cliente: "Delta Farmácia",
-    abertura: "2025-05-06",
-    status: "Concluída",
-    prioridade: "Baixa",
-    responsavel: "Jonas Mendes",
-    alerta: false,
-    descricao: "Configuração de sistema de controle de estoque",
-    ultimaAtualizacao: "2025-05-07T11:20:00"
-  },
-  {
-    codigo: "#55981",
-    cliente: "Hospital Santa Clara",
-    abertura: "2025-05-05",
-    status: "Concluída",
-    prioridade: "Alta",
-    responsavel: "Mariana Santos",
-    alerta: false,
-    descricao: "Manutenção preventiva em equipamentos de monitoramento",
-    ultimaAtualizacao: "2025-05-06T15:10:00"
-  },
-  {
-    codigo: "#55872",
-    cliente: "Restaurante Sabor & Arte",
-    abertura: "2025-05-04",
-    status: "Cancelada",
-    prioridade: "Média",
-    responsavel: "Pedro Alves",
-    alerta: false,
-    descricao: "Instalação de sistema de automação de pedidos",
-    ultimaAtualizacao: "2025-05-05T10:30:00"
-  }
-];
-
 // Funções de estilo
 function getStatusInfo(status) {
   return OSSTATUS.find(s => s.nome === status) || { cor: "#9ca3af", bgColor: "#f3f4f6", icon: <FiFileText /> };
@@ -102,53 +33,335 @@ function getPrioridadeInfo(prio) {
 }
 
 export default function OrdemServico() {
-  const [ordens, setOrdens] = useState(MOCK_OS);
+  const [ordens, setOrdens] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroPrioridade, setFiltroPrioridade] = useState("");
   const [pesquisa, setPesquisa] = useState("");
   const [nova, setNova] = useState({
-    cliente: "",
+    nomeCliente: "",
+    telefoneCliente: "",
+    emailCliente: "",
+    endereco: "",
+    numero: "",
+    cep: "",
+    cidade: "",
+    estado: "",
+    complemento: "",
+    latitude: "",
+    longitude: "",
     prioridade: "Média",
     responsavel: "",
-    desc: ""
+    descricao: ""
   });
   const [showForm, setShowForm] = useState(false);
   const [detalhesOS, setDetalhesOS] = useState(null);
   const [atualizando, setAtualizando] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [mensagensCliente, setMensagensCliente] = useState({});
+  const [inputMensagem, setInputMensagem] = useState({});
+  const companyCnpj = localStorage.getItem("companyCnpj") || "";
 
-  // Efeito de atualização
+  // Efeito para carregar ordens e usuários do Firebase ao montar
   useEffect(() => {
-    if (atualizando) {
-      const timer = setTimeout(() => {
-        setAtualizando(false);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [atualizando]);
+    loadOrdens();
+    loadUsuarios();
+  }, [companyCnpj]);
 
-  // Função para adicionar nova OS
-  function handleAddOS(e) {
+  // Função para carregar usuários do Firebase
+  async function loadUsuarios() {
+    if (!companyCnpj) return;
+    try {
+      const list = await firebase.listCompanyUsers(companyCnpj);
+      setUsuarios(list);
+    } catch (err) {
+      console.error('Erro ao carregar usuários:', err);
+    }
+  }
+
+  // Função para carregar ordens do Firebase
+  async function loadOrdens() {
+    if (!companyCnpj) {
+      setOrdens([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const list = await firebase.listServiceOrders(companyCnpj);
+      setOrdens(list);
+    } catch (err) {
+      console.error('Erro ao carregar ordens:', err);
+      setOrdens([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Função para buscar endereço por CEP usando ViaCEP
+  const handleEnviarWhatsApp = async (nomeCliente, telefone, osId) => {
+    if (!telefone) {
+      alert('Este cliente não possui número de WhatsApp cadastrado');
+      return;
+    }
+
+    try {
+      const userName = localStorage.getItem('userName');
+      const cnpj = localStorage.getItem('companyCnpj');
+
+      if (!userName || !cnpj) {
+        alert('Erro: Usuário ou CNPJ não definido');
+        return;
+      }
+
+      // Criar conversa com o cliente no Chat
+      const chat = await firebase.createChat(cnpj, {
+        titulo: `📱 WhatsApp - ${nomeCliente} (OS #${osId})`,
+        participantes: [userName, `cliente-${telefone}`],
+        tipo: 'cliente-whatsapp',
+        createdBy: userName,
+        telefone: telefone,
+        clienteNome: nomeCliente,
+        osId: osId
+      });
+
+      if (chat && chat.id) {
+        // Enviar mensagem inicial
+        await firebase.sendMessage(cnpj, chat.id, {
+          cpfEnvio: userName,
+          nomeEnvio: userName,
+          conteudo: `Iniciada conversa com cliente ${nomeCliente} via WhatsApp - OS #${osId}`,
+          tipo: 'sistema'
+        });
+
+        alert(`✅ Conversa criada! Vá até o Chat para conversar com o cliente.`);
+      }
+    } catch (err) {
+      console.error('Erro ao criar conversa:', err);
+      alert('Erro ao criar conversa. Tente novamente.');
+    }
+  };
+
+  const handleEnviarMensagemCliente = (osId, mensagem) => {
+    if (!mensagem.trim()) return;
+    
+    // Adicionar mensagem ao estado local
+    setMensagensCliente(prev => ({
+      ...prev,
+      [osId]: [...(prev[osId] || []), {
+        id: Date.now(),
+        texto: mensagem,
+        enviado: true,
+        data: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      }]
+    }));
+    
+    // Limpar input usando estado
+    setInputMensagem(prev => ({
+      ...prev,
+      [osId]: ''
+    }));
+  };
+
+  // Função para buscar endereço por CEP usando ViaCEP
+  async function buscarEnderecoByCEP() {
+    const cepLimpo = nova.cep.replace(/\D/g, '');
+    
+    if (cepLimpo.length !== 8) {
+      alert('CEP deve ter 8 dígitos');
+      return;
+    }
+
+    setAtualizando(true);
+    
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const dados = await response.json();
+      
+      if (dados.erro) {
+        alert('❌ CEP não encontrado. Verifique e tente novamente.');
+        setAtualizando(false);
+        return;
+      }
+
+      // Preencher endereço automaticamente
+      setNova(prev => ({ 
+        ...prev, 
+        endereco: dados.logradouro || '',
+        cidade: dados.localidade || '',
+        estado: dados.uf || '',
+        numero: '' // Usuario preenche manualmente
+      }));
+      
+      alert(`✅ Endereço encontrado!\n${dados.logradouro}\n${dados.localidade}, ${dados.uf}`);
+      
+      // Agora buscar coordenadas do endereço completo
+      const enderecoCompleto = `${dados.logradouro}, ${dados.localidade}, ${dados.uf}, Brasil`;
+      const geoResponse = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enderecoCompleto)}`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
+      );
+      const geoResults = await geoResponse.json();
+      
+      if (geoResults.length > 0) {
+        setNova(prev => ({ 
+          ...prev, 
+          latitude: geoResults[0].lat, 
+          longitude: geoResults[0].lon 
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar endereço:', err);
+      alert('❌ Erro ao buscar endereço. Verifique sua internet.');
+    } finally {
+      setAtualizando(false);
+    }
+  }
+
+  // Função para buscar coordenadas do endereço (quando não tiver CEP)
+  async function buscarCoordenadas() {
+    if (!nova.endereco || !nova.numero || !nova.cidade || !nova.estado) {
+      alert('Preencha o endereço, número, cidade e estado para buscar a localização no mapa');
+      return;
+    }
+
+    setAtualizando(true);
+    const endereco = `${nova.endereco}, ${nova.numero}, ${nova.cidade}, ${nova.estado}, Brasil`;
+    
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(endereco)}`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
+      );
+      const results = await response.json();
+      
+      if (results.length > 0) {
+        const { lat, lon } = results[0];
+        setNova(prev => ({ ...prev, latitude: lat, longitude: lon }));
+        alert(`✅ Localização encontrada no mapa!\n\nCidade: ${results[0].address?.city || nova.cidade}\nLatitude: ${parseFloat(lat).toFixed(4)}\nLongitude: ${parseFloat(lon).toFixed(4)}`);
+      } else {
+        alert('❌ Localização não encontrada. Verifique os dados e tente novamente.');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar localização:', err);
+      alert('❌ Erro ao buscar localização. Verifique sua internet.');
+    } finally {
+      setAtualizando(false);
+    }
+  }
+
+  // Função para adicionar nova OS com auto-geocodificação
+  async function handleAddOS(e) {
     e.preventDefault();
-    const codigo = "#" + Math.floor(55000 + Math.random() * 5000);
-    const novaOS = {
-      codigo,
-      cliente: nova.cliente,
-      abertura: new Date().toISOString().slice(0, 10),
-      status: "Pendente",
-      prioridade: nova.prioridade,
-      responsavel: nova.responsavel,
-      alerta: false,
-      descricao: nova.desc,
-      ultimaAtualizacao: new Date().toISOString()
-    };
+    if (!companyCnpj) {
+      alert('CNPJ da empresa não encontrado');
+      return;
+    }
     
-    setOrdens([novaOS, ...ordens]);
-    setNova({ cliente: "", prioridade: "Média", responsavel: "", desc: "" });
-    setShowForm(false);
-    
-    // Mostrar notificação de sucesso
-    alert(`Ordem de serviço ${codigo} criada com sucesso!`);
+    if (!nova.nomeCliente || !nova.numero || !nova.endereco || !nova.cidade || !nova.estado) {
+      alert('Preencha o CEP primeiro para carregar o endereço, depois adicione o número');
+      return;
+    }
+
+    if (!nova.responsavel) {
+      alert('Selecione um responsável');
+      return;
+    }
+
+    if (!nova.descricao) {
+      alert('Descreva o serviço a ser realizado');
+      return;
+    }
+
+    setAtualizando(true);
+
+    try {
+      // Garantir que tem coordenadas
+      let latitude = nova.latitude;
+      let longitude = nova.longitude;
+
+      if (!latitude || !longitude) {
+        const endereco = `${nova.endereco}, ${nova.numero}, ${nova.cidade}, ${nova.estado}, Brasil`;
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(endereco)}`);
+        const results = await response.json();
+
+        if (results.length > 0) {
+          latitude = results[0].lat;
+          longitude = results[0].lon;
+        } else {
+          alert('Não foi possível localizar o endereço no mapa. Clique em "Localizar no Mapa".');
+          setAtualizando(false);
+          return;
+        }
+      }
+
+      const novaOS = {
+        cliente: nova.nomeCliente,
+        telefone: nova.telefoneCliente,
+        ...(nova.emailCliente ? { email: nova.emailCliente } : {}),
+        endereco: nova.endereco,
+        numero: nova.numero,
+        complemento: nova.complemento,
+        cep: nova.cep,
+        cidade: nova.cidade,
+        estado: nova.estado,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        abertura: new Date().toISOString().slice(0, 10),
+        status: "Pendente",
+        prioridade: nova.prioridade,
+        responsavel: nova.responsavel,
+        alerta: false,
+        descricao: nova.descricao,
+        ultimaAtualizacao: new Date().toISOString()
+      };
+
+      // Salvar no Firebase
+      await firebase.createServiceOrder(companyCnpj, novaOS);
+      
+      // Notificar todos os usuários sobre a nova OS
+      await firebase.notifyAllUsers(companyCnpj, {
+        type: 'nova_os',
+        titulo: 'Nova Ordem de Serviço Criada',
+        mensagem: `Nova OS para ${nova.nomeCliente} em ${nova.cidade}, ${nova.estado}. Prioridade: ${nova.prioridade}`,
+        osInfo: {
+          cliente: nova.nomeCliente,
+          cidade: nova.cidade,
+          estado: nova.estado,
+          prioridade: nova.prioridade
+        }
+      }, ['funcionario', 'gerente', 'admin']);
+      
+      // Mostrar notificação visual no header
+      if (window.showHeaderNotification) {
+        window.showHeaderNotification('📋 Nova OS Criada', `OS para ${nova.nomeCliente} em ${nova.cidade}`, 'success');
+      }
+      
+      setNova({
+        nomeCliente: "",
+        telefoneCliente: "",
+        emailCliente: "",
+        endereco: "",
+        numero: "",
+        cep: "",
+        cidade: "",
+        estado: "",
+        complemento: "",
+        latitude: "",
+        longitude: "",
+        prioridade: "Média",
+        responsavel: "",
+        descricao: ""
+      });
+      setShowForm(false);
+      await loadOrdens();
+      alert(`✅ Ordem de Serviço criada com sucesso!\n\n${nova.nomeCliente} em ${nova.cidade}, ${nova.estado}`);
+    } catch (err) {
+      console.error('Erro ao criar OS:', err);
+      alert(`❌ Erro ao criar OS: ${err.message}`);
+    } finally {
+      setAtualizando(false);
+    }
   }
 
   // Função para mudar status
@@ -673,7 +886,7 @@ export default function OrdemServico() {
             </div>
             
             <form onSubmit={handleAddOS} style={{ display: "grid", gap: "20px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <label style={{ 
                     color: theme.subtext, 
@@ -684,14 +897,14 @@ export default function OrdemServico() {
                     gap: "6px"
                   }}>
                     <FiUser size={14} />
-                    Cliente
+                    Nome do Cliente *
                   </label>
                   <input
                     required
                     type="text"
-                    placeholder="Nome do cliente"
-                    value={nova.cliente}
-                    onChange={e => setNova(prev => ({ ...prev, cliente: e.target.value }))}
+                    placeholder="Nome completo do cliente"
+                    value={nova.nomeCliente}
+                    onChange={e => setNova(prev => ({ ...prev, nomeCliente: e.target.value }))}
                     style={{
                       background: theme.inputBg,
                       color: theme.inputText,
@@ -705,6 +918,67 @@ export default function OrdemServico() {
                   />
                 </div>
                 
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <FiPhone size={14} />
+                    Telefone do Cliente *
+                  </label>
+                  <input
+                    required
+                    type="tel"
+                    placeholder="(XX) XXXXX-XXXX"
+                    value={nova.telefoneCliente}
+                    onChange={e => setNova(prev => ({ ...prev, telefoneCliente: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.inputText,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  />
+                </div>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <FiMail size={14} />
+                    E-mail do Cliente
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="cliente@email.com"
+                    value={nova.emailCliente}
+                    onChange={e => setNova(prev => ({ ...prev, emailCliente: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.inputText,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  />
+                </div>
+
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <label style={{ 
                     color: theme.subtext, 
@@ -736,7 +1010,7 @@ export default function OrdemServico() {
                     {PRIORIDADES.map(p => <option key={p.nome}>{p.nome}</option>)}
                   </select>
                 </div>
-                
+
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <label style={{ 
                     color: theme.subtext, 
@@ -747,14 +1021,239 @@ export default function OrdemServico() {
                     gap: "6px"
                   }}>
                     <FiUser size={14} />
-                    Responsável
+                    Responsável *
+                  </label>
+                  <select
+                    required
+                    value={nova.responsavel}
+                    onChange={e => setNova(prev => ({ ...prev, responsavel: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.inputText,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      cursor: "pointer",
+                      appearance: "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <option value="">Selecione um responsável</option>
+                    {usuarios.map(u => (
+                      <option key={u.id} value={u.displayName || u.username}>
+                        {u.displayName || u.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <FiMapPin size={14} />
+                    CEP * (Preenchat primeiro!)
                   </label>
                   <input
                     required
                     type="text"
-                    placeholder="Nome do responsável"
-                    value={nova.responsavel}
-                    onChange={e => setNova(prev => ({ ...prev, responsavel: e.target.value }))}
+                    placeholder="XXXXX-XXX"
+                    value={nova.cep}
+                    onChange={e => {
+                      const valor = e.target.value;
+                      setNova(prev => ({ ...prev, cep: valor }));
+                      // Auto-buscar quando digitar 8 dígitos
+                      if (valor.replace(/\D/g, '').length === 8) {
+                        setTimeout(() => buscarEnderecoByCEP(), 300);
+                      }
+                    }}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.inputText,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500
+                  }}>
+                    Número *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Nº"
+                    value={nova.numero}
+                    onChange={e => setNova(prev => ({ ...prev, numero: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.inputText,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignSelf: "flex-end" }}>
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={buscarEnderecoByCEP}
+                    disabled={nova.cep.replace(/\D/g, '').length !== 8}
+                    style={{
+                      background: nova.cep.replace(/\D/g, '').length === 8 ? theme.highlight : theme.border,
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      fontSize: "0.85rem",
+                      cursor: nova.cep.replace(/\D/g, '').length === 8 ? "pointer" : "not-allowed",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.2s ease",
+                      opacity: atualizando ? 0.7 : 1
+                    }}
+                  >
+                    <FiMapPin size={14} />
+                    {atualizando ? "Buscando..." : "Buscar"}
+                  </motion.button>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <FiMapPin size={14} />
+                    Endereço (Preenchido automaticamente)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Carregará automaticamente ao buscar CEP"
+                    value={nova.endereco}
+                    disabled
+                    onChange={e => setNova(prev => ({ ...prev, endereco: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.subtext,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease",
+                      cursor: "not-allowed",
+                      opacity: 0.7
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500
+                  }}>
+                    Cidade (Preenchida automaticamente)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Carregará automaticamente"
+                    value={nova.cidade}
+                    disabled
+                    onChange={e => setNova(prev => ({ ...prev, cidade: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.subtext,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease",
+                      cursor: "not-allowed",
+                      opacity: 0.7
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500
+                  }}>
+                    Estado (Preenchido automaticamente)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="UF"
+                    maxLength="2"
+                    value={nova.estado}
+                    disabled
+                    onChange={e => setNova(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.subtext,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease",
+                      cursor: "not-allowed",
+                      opacity: 0.7
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500
+                  }}>
+                    Complemento (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Apto, sala, andar, etc"
+                    value={nova.complemento || ""}
+                    onChange={e => setNova(prev => ({ ...prev, complemento: e.target.value }))}
                     style={{
                       background: theme.inputBg,
                       color: theme.inputText,
@@ -768,6 +1267,94 @@ export default function OrdemServico() {
                   />
                 </div>
               </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", padding: "16px", background: `${theme.bg}`, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500
+                  }}>
+                    Latitude (Auto-preenchida)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    placeholder="Ex: -23.5505"
+                    value={nova.latitude}
+                    disabled
+                    onChange={e => setNova(prev => ({ ...prev, latitude: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.subtext,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease",
+                      cursor: "not-allowed",
+                      opacity: 0.7
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <label style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.9rem", 
+                    fontWeight: 500
+                  }}>
+                    Longitude (Auto-preenchida)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    placeholder="Ex: -46.6333"
+                    value={nova.longitude}
+                    disabled
+                    onChange={e => setNova(prev => ({ ...prev, longitude: e.target.value }))}
+                    style={{
+                      background: theme.inputBg,
+                      color: theme.subtext,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px",
+                      padding: "12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease",
+                      cursor: "not-allowed",
+                      opacity: 0.7
+                    }}
+                  />
+                </div>
+              </div>
+
+              <motion.button 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={buscarCoordenadas}
+                disabled={!nova.endereco || !nova.numero || !nova.cidade || !nova.estado}
+                style={{
+                  background: (nova.endereco && nova.numero && nova.cidade && nova.estado) ? theme.highlight + "20" : theme.border,
+                  color: (nova.endereco && nova.numero && nova.cidade && nova.estado) ? theme.highlight : theme.subtext,
+                  border: `1px solid ${(nova.endereco && nova.numero && nova.cidade && nova.estado) ? theme.highlight : theme.border}`,
+                  borderRadius: "8px",
+                  padding: "12px 20px",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  cursor: (nova.endereco && nova.numero && nova.cidade && nova.estado) ? "pointer" : "not-allowed",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                <FiMapPin size={18} />
+                {atualizando ? "Localizando no mapa..." : "Localizar no Mapa"}
+              </motion.button>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 <label style={{ 
@@ -779,12 +1366,13 @@ export default function OrdemServico() {
                   gap: "6px"
                 }}>
                   <FiFileText size={14} />
-                  Descrição
+                  Descrição do Serviço *
                 </label>
                 <textarea
-                  placeholder="Descreva o problema ou serviço a ser realizado"
-                  value={nova.desc}
-                  onChange={e => setNova(prev => ({ ...prev, desc: e.target.value }))}
+                  required
+                  placeholder="Descreva o problema ou serviço a ser realizado com detalhes"
+                  value={nova.descricao}
+                  onChange={e => setNova(prev => ({ ...prev, descricao: e.target.value }))}
                   style={{
                     background: theme.inputBg,
                     color: theme.inputText,
@@ -792,7 +1380,7 @@ export default function OrdemServico() {
                     borderRadius: "8px",
                     padding: "12px",
                     fontSize: "0.95rem",
-                    minHeight: "100px",
+                    minHeight: "120px",
                     resize: "vertical",
                     outline: "none",
                     transition: "all 0.2s ease"
@@ -801,7 +1389,7 @@ export default function OrdemServico() {
               </div>
               
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-                                <motion.button 
+                <motion.button 
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   type="button" 
@@ -892,7 +1480,15 @@ export default function OrdemServico() {
                   color: theme.text, 
                   fontWeight: 600 
                 }}>
-                  Abertura
+                  Telefone
+                </th>
+                <th style={{ 
+                  padding: "16px", 
+                  textAlign: "left", 
+                  color: theme.text, 
+                  fontWeight: 600 
+                }}>
+                  Endereço
                 </th>
                 <th style={{ 
                   padding: "16px", 
@@ -964,9 +1560,12 @@ export default function OrdemServico() {
                       </td>
                       <td style={{ padding: "16px", color: theme.text }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <FiCalendar size={14} color={theme.subtext} />
-                          {formatDate(os.abertura)}
+                          <FiPhone size={14} color={theme.subtext} />
+                          {os.telefone || '-'}
                         </div>
+                      </td>
+                      <td style={{ padding: "16px", color: theme.text, fontSize: "0.9rem" }}>
+                        {os.endereco && os.numero ? `${os.endereco}, ${os.numero}` : '-'}
                       </td>
                       <td style={{ padding: "16px" }}>
                         <div style={{
@@ -1116,7 +1715,7 @@ export default function OrdemServico() {
               ) : (
                 <tr>
                   <td 
-                    colSpan={8} 
+                    colSpan={9} 
                     style={{ 
                       textAlign: "center", 
                       padding: "32px", 
@@ -1250,12 +1849,81 @@ export default function OrdemServico() {
                     fontSize: "0.85rem", 
                     margin: "0 0 4px 0" 
                   }}>
+                    Telefone
+                  </p>
+                  <div style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "center"
+                  }}>
+                    <div style={{ 
+                      color: theme.text, 
+                      fontWeight: 500, 
+                      fontSize: "1rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      flex: 1
+                    }}>
+                      <FiPhone size={16} />
+                      {detalhesOS.telefone || '-'}
+                    </div>
+                    {detalhesOS.telefone && (
+                      <button
+                        onClick={() => handleEnviarWhatsApp(detalhesOS.cliente, detalhesOS.telefone, detalhesOS.codigo)}
+                        style={{
+                          padding: "6px 12px",
+                          backgroundColor: "#25d366",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          fontSize: "0.8rem",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap"
+                        }}
+                        title="Enviar mensagem via WhatsApp"
+                      >
+                        📱 WhatsApp
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.85rem", 
+                    margin: "0 0 4px 0" 
+                  }}>
+                    E-mail
+                  </p>
+                  <p style={{ 
+                    color: theme.text, 
+                    fontWeight: 500, 
+                    fontSize: "1rem", 
+                    margin: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <FiMail size={16} />
+                    {detalhesOS.email || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.85rem", 
+                    margin: "0 0 4px 0" 
+                  }}>
                     Responsável
                   </p>
                   <p style={{ 
                     color: theme.text, 
                     fontWeight: 600, 
-                    fontSize: "1.1rem", 
+                    fontSize: "1rem", 
                     margin: 0,
                     display: "flex",
                     alignItems: "center",
@@ -1278,7 +1946,81 @@ export default function OrdemServico() {
                     {detalhesOS.responsavel}
                   </p>
                 </div>
-                
+              </div>
+
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: "2fr 1fr 1fr", 
+                gap: "20px", 
+                marginBottom: "24px",
+                paddingBottom: "20px",
+                borderBottom: `1px solid ${theme.border}`
+              }}>
+                <div>
+                  <p style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.85rem", 
+                    margin: "0 0 4px 0" 
+                  }}>
+                    Endereço
+                  </p>
+                  <p style={{ 
+                    color: theme.text, 
+                    fontWeight: 500, 
+                    fontSize: "1rem", 
+                    margin: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <FiMapPin size={16} />
+                    {detalhesOS.endereco && detalhesOS.numero ? `${detalhesOS.endereco}, ${detalhesOS.numero}` : '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.85rem", 
+                    margin: "0 0 4px 0" 
+                  }}>
+                    CEP
+                  </p>
+                  <p style={{ 
+                    color: theme.text, 
+                    fontWeight: 500, 
+                    fontSize: "1rem", 
+                    margin: 0 
+                  }}>
+                    {detalhesOS.cep || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.85rem", 
+                    margin: "0 0 4px 0" 
+                  }}>
+                    Cidade/Estado
+                  </p>
+                  <p style={{ 
+                    color: theme.text, 
+                    fontWeight: 500, 
+                    fontSize: "1rem", 
+                    margin: 0 
+                  }}>
+                    {detalhesOS.cidade && detalhesOS.estado ? `${detalhesOS.cidade}, ${detalhesOS.estado}` : '-'}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: "1fr 1fr", 
+                gap: "20px", 
+                marginBottom: "24px" 
+              }}>
                 <div>
                   <p style={{ 
                     color: theme.subtext, 
@@ -1407,6 +2149,133 @@ export default function OrdemServico() {
                   border: `1px solid ${theme.border}`
                 }}>
                   {detalhesOS.descricao || "Sem descrição disponível."}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "24px" }}>
+                <p style={{ 
+                  color: theme.subtext, 
+                  fontSize: "0.85rem", 
+                  margin: "0 0 12px 0" 
+                }}>
+                  💬 Comunicação com Cliente
+                </p>
+                <div style={{
+                  background: `${theme.bg}`,
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "250px"
+                }}>
+                  {/* Área de mensagens */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}>
+                    {(mensagensCliente[detalhesOS.codigo] || []).length === 0 ? (
+                      <div style={{
+                        textAlign: "center",
+                        color: theme.subtext,
+                        fontSize: "0.85rem",
+                        padding: "20px",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%"
+                      }}>
+                        📱 Clique em <strong>WhatsApp</strong> acima para iniciar conversa com o cliente<br/>
+                        ou envie uma mensagem aqui
+                      </div>
+                    ) : (
+                      (mensagensCliente[detalhesOS.codigo] || []).map((msg) => (
+                        <div
+                          key={msg.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: msg.enviado ? "flex-end" : "flex-start",
+                            marginBottom: "4px"
+                          }}
+                        >
+                          <div
+                            style={{
+                              maxWidth: "70%",
+                              padding: "8px 12px",
+                              borderRadius: "8px",
+                              backgroundColor: msg.enviado ? "#dcfce7" : "#f0f0f0",
+                              color: "#000",
+                              fontSize: "0.85rem",
+                              wordBreak: "break-word"
+                            }}
+                          >
+                            <div>{msg.texto}</div>
+                            <div style={{
+                              fontSize: "0.7rem",
+                              opacity: 0.6,
+                              marginTop: "4px"
+                            }}>
+                              {msg.data}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  {/* Área de entrada */}
+                  <div style={{
+                    padding: "12px",
+                    borderTop: `1px solid ${theme.border}`,
+                    display: "flex",
+                    gap: "8px"
+                  }}>
+                    <input
+                      type="text"
+                      placeholder="Mensagem para o cliente..."
+                      value={inputMensagem[detalhesOS.codigo] || ''}
+                      onChange={(e) => setInputMensagem(prev => ({
+                        ...prev,
+                        [detalhesOS.codigo]: e.target.value
+                      }))}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleEnviarMensagemCliente(detalhesOS.codigo, inputMensagem[detalhesOS.codigo]);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        border: `1px solid ${theme.border}`,
+                        backgroundColor: theme.inputBg || theme.bg,
+                        color: theme.text,
+                        fontSize: "0.85rem"
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        handleEnviarMensagemCliente(detalhesOS.codigo, inputMensagem[detalhesOS.codigo]);
+                      }}
+                      style={{
+                        padding: "8px 16px",
+                        backgroundColor: "#25d366",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontSize: "0.85rem",
+                        fontWeight: "600",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Enviar
+                    </button>
+                  </div>
                 </div>
               </div>
               

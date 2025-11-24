@@ -1113,3 +1113,49 @@ body {
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
 }
+
+/* CRM specific & badge styles */
+.crm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin: 8px 12px;
+  color: var(--text-medium);
+  background: linear-gradient(90deg, rgba(14,165,233,0.06), transparent);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.crm-link:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.company-badge {
+  display: inline-block;
+  background: linear-gradient(90deg, #dbeafe, #e0f2fe);
+  color: var(--primary-dark);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-left: 8px;
+  border: 1px solid rgba(14,165,233,0.15);
+}
+
+.menu-link {
+  display: block;
+  padding: 10px 16px;
+  margin: 4px 12px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-light);
+}
+
+.menu-link:hover {
+  background: var(--bg-light);
+  color: var(--primary);
+}

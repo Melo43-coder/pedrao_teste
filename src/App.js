@@ -16,6 +16,7 @@ import CarouselBeneficios from "./components/Landing/Carouselbeneficios";
 // Sistema Components
 import Login from "./components/Sistema/Login";
 import Dashboard from "./components/Sistema/Dashboard";
+import AdminPanel from "./crm/AdminPanel";
 
 // Layout para Landing Page
 const LandingLayout = () => (
@@ -90,6 +91,16 @@ export default function App() {
               <Dashboard />
             </ProtectedRoute>
           } 
+        />
+
+        {/* Painel CRM (admin) */}
+        <Route
+          path="/crm"
+          element={
+            <ProtectedRoute>
+              <AdminPanel />
+            </ProtectedRoute>
+          }
         />
 
         {/* Redirecionamentos */}

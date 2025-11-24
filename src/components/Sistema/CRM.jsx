@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import firebaseService from '../../services/firebase';
+import { normalizeCnpj } from '../../utils/cnpj';
 
 // Dados mock para demonstração
 const MOCK_CLIENTES = [
@@ -306,6 +308,14 @@ export default function CRM() {
     observacoes: ""
   });
   const [conversaAtual, setConversaAtual] = useState(null);
+  // Users management (company users)
+  const [users, setUsers] = useState([]);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [newUser, setNewUser] = useState({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '' });
+
+  const userRoleLocal = localStorage.getItem('userRole') || 'user';
+  const companyCnpjLocal = localStorage.getItem('companyCnpj') || '';
 
   // Carregar dados
   useEffect(() => {
@@ -453,6 +463,79 @@ export default function CRM() {
       }
     });
     return segmentos;
+  };
+
+  // --- Company users management ---
+  const loadCompanyUsers = async () => {
+    if (!companyCnpjLocal) return setUsers([]);
+    try {
+      // Use API fallback via services/api which already handles firebase fallback
+      const list = await firebaseService.listCompanyUsers(companyCnpjLocal);
+      setUsers(list || []);
+    } catch (err) {
+      console.error('Erro ao carregar usuários da empresa:', err);
+      setUsers([]);
+    }
+  };
+
+  useEffect(() => {
+    // load users when component mounts if user is manager/admin
+    if (userRoleLocal === 'admin' || userRoleLocal === 'gerente') {
+      loadCompanyUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleOpenNewUser = () => {
+    setEditingUser(null);
+    setNewUser({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '' });
+    setShowUserModal(true);
+  };
+
+  const handleEditUser = (u) => {
+    setEditingUser(u);
+    setNewUser({ usuario: u.username || '', senha: '', displayName: u.displayName || '', role: u.role || 'user', active: !!u.active, email: u.email || '', phone: u.phone || '', address: u.address || '', addressNumber: u.addressNumber || '' });
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = async () => {
+    if (!companyCnpjLocal) return alert('CNPJ da empresa não definido.');
+    try {
+      if (editingUser) {
+        // update
+        const upd = {
+          displayName: newUser.displayName,
+          role: newUser.role,
+          active: !!newUser.active,
+          email: newUser.email || null,
+          phone: newUser.phone || null,
+          address: newUser.address || null,
+          addressNumber: newUser.addressNumber || null
+        };
+        await firebaseService.updateUser(companyCnpjLocal, editingUser.id, upd);
+        await loadCompanyUsers();
+        setShowUserModal(false);
+      } else {
+        // create
+        if (!newUser.usuario || !newUser.senha) return alert('Usuário e senha são obrigatórios');
+        await firebaseService.registerUser({ cnpj: companyCnpjLocal, usuario: newUser.usuario, senha: newUser.senha, displayName: newUser.displayName, role: newUser.role, active: newUser.active, email: newUser.email, phone: newUser.phone, address: newUser.address, addressNumber: newUser.addressNumber });
+        await loadCompanyUsers();
+        setShowUserModal(false);
+      }
+    } catch (err) {
+      console.error('Erro ao salvar usuário:', err);
+      alert('Erro ao salvar usuário. Veja o console para detalhes.');
+    }
+  };
+
+  const handleToggleActive = async (u) => {
+    try {
+      await firebaseService.updateUser(companyCnpjLocal, u.id, { active: !u.active });
+      await loadCompanyUsers();
+    } catch (err) {
+      console.error('Erro ao alternar ativo:', err);
+      alert('Erro ao alterar status do usuário.');
+    }
   };
 
   // Handlers
@@ -1359,6 +1442,23 @@ export default function CRM() {
         >
           Área de Funcionários
         </button>
+        {(userRoleLocal === 'admin' || userRoleLocal === 'gerente') && (
+          <button 
+            style={{
+              ...styles.areaButton,
+              ...(activeArea === "usuarios" ? styles.areaButtonActive : styles.areaButtonInactive)
+            }}
+            onClick={() => {
+              setActiveArea("usuarios");
+              setActiveTab("lista");
+              setClienteSelecionado(null);
+              setFuncionarioSelecionado(null);
+              loadCompanyUsers();
+            }}
+          >
+            Área de Usuários (Empresa)
+          </button>
+        )}
       </div>
 
       {/* Área de Clientes */}
@@ -1529,6 +1629,145 @@ export default function CRM() {
               {activeTab === "mensagens" && <div style={styles.activeTabIndicator}></div>}
             </button>
           </div>
+
+          {/* Users management area (only for gerente/admin) */}
+          {activeArea === "usuarios" && (userRoleLocal === 'admin' || userRoleLocal === 'gerente') && (
+            <div>
+              <div style={{...styles.actionBar, marginTop: 8}}>
+                <div style={styles.searchContainer}>
+                  <input
+                    type="text"
+                    placeholder="Buscar usuário, email..."
+                    style={styles.searchInput}
+                    value={filtroTexto}
+                    onChange={(e) => setFiltroTexto(e.target.value)}
+                  />
+                </div>
+                <div style={styles.buttonGroup}>
+                  <button style={{...styles.button, ...styles.primaryButton}} onClick={handleOpenNewUser}>✚ Novo Usuário</button>
+                  <button style={{...styles.button, ...styles.outlineButton}} onClick={loadCompanyUsers}>⟳ Recarregar</button>
+                </div>
+              </div>
+
+              <div style={styles.mainContent}>
+                <div style={styles.tableContainer}>
+                  {users.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <div style={styles.emptyStateIcon}>👥</div>
+                      <p style={styles.emptyStateText}>Nenhum usuário cadastrado para este CNPJ.</p>
+                      <button style={{...styles.button, ...styles.primaryButton}} onClick={handleOpenNewUser}>Criar Usuário</button>
+                    </div>
+                  ) : (
+                    <table style={styles.table}>
+                      <thead>
+                        <tr>
+                          <th style={styles.tableHeader}>Usuário</th>
+                          <th style={styles.tableHeader}>Nome</th>
+                          <th style={styles.tableHeader}>E-mail</th>
+                          <th style={styles.tableHeader}>Telefone</th>
+                          <th style={styles.tableHeader}>Role</th>
+                          <th style={styles.tableHeader}>Ativo</th>
+                          <th style={styles.tableHeader}>Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.filter(u => {
+                          if (!filtroTexto) return true;
+                          const ft = filtroTexto.toLowerCase();
+                          return (u.username && u.username.toLowerCase().includes(ft)) || (u.displayName && u.displayName.toLowerCase().includes(ft)) || (u.email && u.email.toLowerCase().includes(ft));
+                        }).map(u => (
+                          <tr key={u.id} style={styles.tableRow}>
+                            <td style={styles.tableCell}>{u.username}</td>
+                            <td style={styles.tableCell}>{u.displayName || '-'}</td>
+                            <td style={styles.tableCell}>{u.email || '-'}</td>
+                            <td style={styles.tableCell}>{u.phone || '-'}</td>
+                            <td style={styles.tableCell}>{u.role || 'user'}</td>
+                            <td style={styles.tableCell}>{u.active ? 'Sim' : 'Não'}</td>
+                            <td style={styles.tableCell}>
+                              <div style={styles.buttonGroup}>
+                                <button style={{...styles.button, ...styles.outlineButton}} onClick={() => handleEditUser(u)}>✎ Editar</button>
+                                <button style={{...styles.button, ...styles.warningButton}} onClick={() => handleToggleActive(u)}>{u.active ? 'Desativar' : 'Ativar'}</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal para criar/editar usuário */}
+              {showUserModal && (
+                <div style={styles.modal}>
+                  <div style={styles.modalContent}>
+                    <div style={styles.modalHeader}>
+                      <h3 style={styles.modalTitle}>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</h3>
+                      <button style={styles.closeButton} onClick={() => setShowUserModal(false)}>×</button>
+                    </div>
+                    <div style={styles.modalBody}>
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Usuário (login)</label>
+                          <input style={styles.input} value={newUser.usuario} onChange={(e) => setNewUser({...newUser, usuario: e.target.value})} disabled={!!editingUser} />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Senha{editingUser ? ' (manter em branco para não alterar)' : ''}</label>
+                          <input style={styles.input} value={newUser.senha} onChange={(e) => setNewUser({...newUser, senha: e.target.value})} type="password" />
+                        </div>
+                      </div>
+
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Nome</label>
+                          <input style={styles.input} value={newUser.displayName} onChange={(e) => setNewUser({...newUser, displayName: e.target.value})} />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>E-mail</label>
+                          <input style={styles.input} value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} />
+                        </div>
+                      </div>
+
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Telefone</label>
+                          <input style={styles.input} value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Endereço / Nº</label>
+                          <input style={styles.input} value={newUser.address} onChange={(e) => setNewUser({...newUser, address: e.target.value})} placeholder="Endereço" />
+                          <input style={{...styles.input, marginTop:8}} value={newUser.addressNumber} onChange={(e) => setNewUser({...newUser, addressNumber: e.target.value})} placeholder="Número" />
+                        </div>
+                      </div>
+
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Role</label>
+                          <select style={styles.input} value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})}>
+                            <option value="admin">admin</option>
+                            <option value="gerente">gerente</option>
+                            <option value="funcionario">funcionario</option>
+                            <option value="user">user</option>
+                          </select>
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Ativo</label>
+                          <select style={styles.input} value={newUser.active ? 'true' : 'false'} onChange={(e) => setNewUser({...newUser, active: e.target.value === 'true'})}>
+                            <option value="true">Sim</option>
+                            <option value="false">Não</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.modalFooter}>
+                      <button style={{...styles.button, ...styles.outlineButton}} onClick={() => setShowUserModal(false)}>Cancelar</button>
+                      <button style={{...styles.button, ...styles.primaryButton}} onClick={handleSaveUser}>{editingUser ? 'Salvar Alterações' : 'Criar Usuário'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Conteúdo */}
           {isLoading ? (

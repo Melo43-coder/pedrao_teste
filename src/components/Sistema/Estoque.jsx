@@ -1,184 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-
-// Dados mock para demonstração
-const MOCK_ITEMS = [
-  { 
-    id: "1", 
-    nome: "Cabo HDMI 2.0", 
-    categoria: "Cabos", 
-    quantidade: 23, 
-    unidade: "un", 
-    valorUnitario: 45.90, 
-    fornecedor: "TechSupply", 
-    ultimaCompra: "2025-04-02",
-    localizacao: "Prateleira A3",
-    status: "Disponível",
-    reservado: 3,
-    minimo: 5
-  },
-  { 
-    id: "2", 
-    nome: "Conector RJ45", 
-    categoria: "Conectores", 
-    quantidade: 145, 
-    unidade: "un", 
-    valorUnitario: 1.25, 
-    fornecedor: "NetParts", 
-    ultimaCompra: "2025-03-15",
-    localizacao: "Gaveta B2",
-    status: "Disponível",
-    reservado: 0,
-    minimo: 50
-  },
-  { 
-    id: "3", 
-    nome: "Pasta Térmica 5g", 
-    categoria: "Refrigeração", 
-    quantidade: 8, 
-    unidade: "un", 
-    valorUnitario: 15.50, 
-    fornecedor: "TechSupply", 
-    ultimaCompra: "2025-03-28",
-    localizacao: "Armário C1",
-    status: "Baixo Estoque",
-    reservado: 2,
-    minimo: 10
-  },
-  { 
-    id: "4", 
-    nome: "Fonte ATX 500W", 
-    categoria: "Componentes", 
-    quantidade: 12, 
-    unidade: "un", 
-    valorUnitario: 220.00, 
-    fornecedor: "PowerTech", 
-    ultimaCompra: "2025-03-10",
-    localizacao: "Prateleira D4",
-    status: "Disponível",
-    reservado: 1,
-    minimo: 3
-  },
-  { 
-    id: "5", 
-    nome: "Álcool Isopropílico 1L", 
-    categoria: "Limpeza", 
-    quantidade: 2, 
-    unidade: "un", 
-    valorUnitario: 35.90, 
-    fornecedor: "CleanTech", 
-    ultimaCompra: "2025-02-20",
-    localizacao: "Armário E2",
-    status: "Baixo Estoque",
-    reservado: 0,
-    minimo: 5
-  },
-  { 
-    id: "6", 
-    nome: "Kit Ferramentas Precisão", 
-    categoria: "Ferramentas", 
-    quantidade: 7, 
-    unidade: "kit", 
-    valorUnitario: 89.90, 
-    fornecedor: "ToolMaster", 
-    ultimaCompra: "2025-03-05",
-    localizacao: "Gaveta F1",
-    status: "Disponível",
-    reservado: 2,
-    minimo: 3
-  },
-  { 
-    id: "7", 
-    nome: "SSD 480GB", 
-    categoria: "Componentes", 
-    quantidade: 0, 
-    unidade: "un", 
-    valorUnitario: 349.90, 
-    fornecedor: "StorageTech", 
-    ultimaCompra: "2025-02-15",
-    localizacao: "Prateleira A1",
-    status: "Indisponível",
-    reservado: 0,
-    minimo: 5
-  }
-];
-
-const MOCK_MOVIMENTACOES = [
-  { 
-    id: "1", 
-    tipo: "Entrada", 
-    data: "2025-04-02", 
-    item: "Cabo HDMI 2.0", 
-    quantidade: 10, 
-    responsavel: "Carlos Silva", 
-    observacao: "Compra mensal" 
-  },
-  { 
-    id: "2", 
-    tipo: "Saída", 
-    data: "2025-04-05", 
-    item: "Cabo HDMI 2.0", 
-    quantidade: 2, 
-    responsavel: "Ana Oliveira", 
-    observacao: "OS #4532 - Cliente XYZ" 
-  },
-  { 
-    id: "3", 
-    tipo: "Saída", 
-    data: "2025-04-05", 
-    item: "Pasta Térmica 5g", 
-    quantidade: 1, 
-    responsavel: "Ana Oliveira", 
-    observacao: "OS #4533 - Manutenção preventiva" 
-  },
-  { 
-    id: "4", 
-    tipo: "Entrada", 
-    data: "2025-04-06", 
-    item: "Conector RJ45", 
-    quantidade: 100, 
-    responsavel: "Carlos Silva", 
-    observacao: "Reposição de estoque" 
-  },
-  { 
-    id: "5", 
-    tipo: "Saída", 
-    data: "2025-04-07", 
-    item: "Fonte ATX 500W", 
-    quantidade: 1, 
-    responsavel: "Rafael Mendes", 
-    observacao: "OS #4540 - Substituição" 
-  }
-];
-
-const MOCK_CATEGORIAS = [
-  "Todas",
-  "Cabos",
-  "Conectores",
-  "Refrigeração",
-  "Componentes",
-  "Limpeza",
-  "Ferramentas"
-];
+import firebase from "../../services/firebase";
 
 // Componente principal
 export default function Estoque() {
   // Estados
   const [items, setItems] = useState([]);
   const [movimentacoes, setMovimentacoes] = useState([]);
-  const [categorias, setCategorias] = useState([]);
+  const [categorias, setCategorias] = useState(["Todas"]);
   const [filtroCategoria, setFiltroCategoria] = useState("Todas");
   const [filtroBusca, setFiltroBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [ordenacao, setOrdenacao] = useState("nome_asc");
   const [activeTab, setActiveTab] = useState("itens");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showMovimentacaoModal, setShowMovimentacaoModal] = useState(false);
   const [tipoMovimentacao, setTipoMovimentacao] = useState("entrada");
   const [itemSelecionado, setItemSelecionado] = useState(null);
   const [quantidadeMovimentacao, setQuantidadeMovimentacao] = useState(1);
   const [observacaoMovimentacao, setObservacaoMovimentacao] = useState("");
   const [showItemModal, setShowItemModal] = useState(false);
+  const [currentCnpj, setCurrentCnpj] = useState("");
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [novaCategoria, setNovaCategoria] = useState("");
   const [novoItem, setNovoItem] = useState({
     nome: "",
     categoria: "",
@@ -189,61 +34,81 @@ export default function Estoque() {
     localizacao: "",
     minimo: 0
   });
+  const [itemEmEdicao, setItemEmEdicao] = useState(null);
+  const [modoEdicao, setModoEdicao] = useState(false);
+
+  // Carregar CNPJ e dados
+  useEffect(() => {
+    const cnpj = localStorage.getItem("companyCnpj");
+    if (cnpj) {
+      setCurrentCnpj(cnpj);
+      loadAllData(cnpj);
+    } else {
+      setError("CNPJ não encontrado. Faça login novamente.");
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Carregar todos os dados
+  const loadAllData = async (cnpj) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const produtosData = await firebase.listProducts(cnpj);
+      setItems(produtosData || []);
+
+      // Carregar categorias do Firebase
+      const categoriasData = await firebase.listCategories(cnpj);
+      setCategorias(categoriasData);
+
+      // Carregar movimentações do Firebase
+      const movimentacoesData = await firebase.listAllMovements(cnpj);
+      setMovimentacoes(movimentacoesData || []);
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+      setError("Erro ao carregar dados do estoque");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Estatísticas
   const totalItens = items.reduce((acc, item) => acc + item.quantidade, 0);
   const totalValorEstoque = items.reduce((acc, item) => acc + (item.quantidade * item.valorUnitario), 0);
-  const itensBaixoEstoque = items.filter(item => item.quantidade <= item.minimo).length;
+  const itensBaixoEstoque = items.filter(item => item.quantidade <= item.minimo && item.quantidade > 0).length;
   const itensIndisponiveis = items.filter(item => item.quantidade === 0).length;
 
-  // Carregar dados
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        // Simulando chamada de API
-        setTimeout(() => {
-          setItems(MOCK_ITEMS);
-          setMovimentacoes(MOCK_MOVIMENTACOES);
-          setCategorias(MOCK_CATEGORIAS);
-          setIsLoading(false);
-        }, 800);
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  // Determinar status do item
+  const getItemStatus = (item) => {
+    if (item.quantidade === 0) return "Indisponível";
+    if (item.quantidade <= item.minimo) return "Baixo Estoque";
+    return "Disponível";
+  };
 
   // Filtrar itens
   const filtrarItens = () => {
     return items.filter(item => {
-      // Filtro de categoria
       if (filtroCategoria !== "Todas" && item.categoria !== filtroCategoria) {
         return false;
       }
-      
-      // Filtro de status
-      if (filtroStatus === "Baixo Estoque" && item.status !== "Baixo Estoque") {
+
+      const status = getItemStatus(item);
+      if (filtroStatus === "Baixo Estoque" && !(item.quantidade <= item.minimo && item.quantidade > 0)) {
         return false;
-      } else if (filtroStatus === "Indisponível" && item.status !== "Indisponível") {
+      } else if (filtroStatus === "Indisponível" && item.quantidade !== 0) {
         return false;
-      } else if (filtroStatus === "Disponível" && item.status !== "Disponível") {
+      } else if (filtroStatus === "Disponível" && (item.quantidade === 0 || item.quantidade <= item.minimo)) {
         return false;
       }
-      
-      // Filtro de busca
+
       if (filtroBusca && !item.nome.toLowerCase().includes(filtroBusca.toLowerCase()) && 
           !item.fornecedor.toLowerCase().includes(filtroBusca.toLowerCase()) &&
           !item.localizacao.toLowerCase().includes(filtroBusca.toLowerCase())) {
         return false;
       }
-      
+
       return true;
     }).sort((a, b) => {
-      // Ordenação
       switch (ordenacao) {
         case "nome_asc":
           return a.nome.localeCompare(b.nome);
@@ -264,90 +129,98 @@ export default function Estoque() {
   };
 
   // Handlers
+  // Handlers
   const handleNovaMovimentacao = (tipo) => {
     setTipoMovimentacao(tipo);
     setShowMovimentacaoModal(true);
   };
 
-  const handleSalvarMovimentacao = () => {
+  const handleSalvarMovimentacao = async () => {
     if (!itemSelecionado || quantidadeMovimentacao <= 0) {
-      alert("Selecione um item e informe uma quantidade válida.");
+      setError("Selecione um item e informe uma quantidade válida.");
       return;
     }
 
-    // Atualizar estoque
-    setItems(prevItems => {
-      return prevItems.map(item => {
-        if (item.id === itemSelecionado) {
-          const novaQuantidade = tipoMovimentacao === "entrada" 
-            ? item.quantidade + quantidadeMovimentacao 
-            : Math.max(0, item.quantidade - quantidadeMovimentacao);
-          
-          // Atualizar status com base na nova quantidade
-          let novoStatus = "Disponível";
-          if (novaQuantidade === 0) {
-            novoStatus = "Indisponível";
-          } else if (novaQuantidade <= item.minimo) {
-            novoStatus = "Baixo Estoque";
-          }
-          
-          return { ...item, quantidade: novaQuantidade, status: novoStatus };
+    try {
+      setIsLoading(true);
+      const produtoAtual = items.find(p => p.id === itemSelecionado);
+
+      if (!produtoAtual) {
+        setError("Produto não encontrado");
+        return;
+      }
+
+      const quantidadeNumero = parseFloat(quantidadeMovimentacao) || 0;
+      const quantidadeAtual = parseFloat(produtoAtual.quantidade) || 0;
+      let novaQuantidade = quantidadeAtual;
+
+      if (tipoMovimentacao === "entrada") {
+        await firebase.addToStock(currentCnpj, itemSelecionado, quantidadeNumero);
+        novaQuantidade = quantidadeAtual + quantidadeNumero;
+      } else {
+        if (quantidadeNumero > quantidadeAtual) {
+          setError(`Quantidade insuficiente. Disponível: ${quantidadeAtual}`);
+          return;
         }
-        return item;
-      });
-    });
+        await firebase.removeFromStock(currentCnpj, itemSelecionado, quantidadeNumero);
+        novaQuantidade = Math.max(0, quantidadeAtual - quantidadeNumero);
+      }
 
-    // Adicionar movimentação
-    const itemInfo = items.find(item => item.id === itemSelecionado);
-    const novaMovimentacao = {
-      id: Date.now().toString(),
-      tipo: tipoMovimentacao === "entrada" ? "Entrada" : "Saída",
-      data: new Date().toISOString().split('T')[0],
-      item: itemInfo?.nome || "Item não encontrado",
-      quantidade: quantidadeMovimentacao,
-      responsavel: "Usuário Atual", // Idealmente, pegar do contexto de autenticação
-      observacao: observacaoMovimentacao
-    };
+      // Atualizar lista local
+      setItems(prevItems => 
+        prevItems.map(item => 
+          item.id === itemSelecionado 
+            ? { ...item, quantidade: novaQuantidade }
+            : item
+        )
+      );
 
-    setMovimentacoes(prev => [novaMovimentacao, ...prev]);
-    
-    // Limpar e fechar modal
-    setItemSelecionado(null);
-    setQuantidadeMovimentacao(1);
-    setObservacaoMovimentacao("");
-    setShowMovimentacaoModal(false);
+      // Registrar movimentação no Firebase
+      const novaMovimentacao = {
+        tipo: tipoMovimentacao === "entrada" ? "Entrada" : "Saída",
+        data: new Date().toISOString().split('T')[0],
+        item: produtoAtual.nome,
+        itemId: itemSelecionado,
+        quantidade: quantidadeNumero,
+        responsavel: localStorage.getItem("userName") || "Usuário",
+        observacao: observacaoMovimentacao
+      };
+
+      await firebase.createMovementRecord(currentCnpj, itemSelecionado, novaMovimentacao);
+      
+      // Adicionar à lista local
+      setMovimentacoes(prev => [{
+        ...novaMovimentacao,
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString()
+      }, ...prev]);
+
+      // Mostrar notificação
+      if (window.showHeaderNotification) {
+        window.showHeaderNotification(
+          tipoMovimentacao === "entrada" ? '📥 Entrada Registrada' : '📤 Saída Registrada',
+          `${produtoAtual.nome} - ${quantidadeNumero} ${produtoAtual.unidade}`,
+          'success'
+        );
+      }
+
+      // Resetar campos
+      setItemSelecionado(null);
+      setQuantidadeMovimentacao(1);
+      setObservacaoMovimentacao("");
+      setShowMovimentacaoModal(false);
+
+    } catch (err) {
+      console.error("Erro ao registrar movimentação:", err);
+      setError("Erro ao registrar movimentação");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleNovoItem = () => {
-    setShowItemModal(true);
-  };
-
-  const handleSalvarItem = () => {
-    if (!novoItem.nome || !novoItem.categoria) {
-      alert("Nome e categoria são obrigatórios.");
-      return;
-    }
-
-    // Definir status com base na quantidade
-    let status = "Disponível";
-    if (novoItem.quantidade === 0) {
-      status = "Indisponível";
-    } else if (novoItem.quantidade <= novoItem.minimo) {
-      status = "Baixo Estoque";
-    }
-
-    // Adicionar novo item
-    const item = {
-      id: Date.now().toString(),
-      ...novoItem,
-      status,
-      reservado: 0,
-      ultimaCompra: new Date().toISOString().split('T')[0]
-    };
-
-    setItems(prev => [...prev, item]);
-    
-    // Limpar e fechar modal
+    setModoEdicao(false);
+    setItemEmEdicao(null);
     setNovoItem({
       nome: "",
       categoria: "",
@@ -358,7 +231,230 @@ export default function Estoque() {
       localizacao: "",
       minimo: 0
     });
-    setShowItemModal(false);
+    setShowItemModal(true);
+  };
+
+  const handleEditarItem = (item) => {
+    setModoEdicao(true);
+    setItemEmEdicao(item.id);
+    setNovoItem({
+      nome: item.nome,
+      categoria: item.categoria,
+      quantidade: item.quantidade,
+      unidade: item.unidade,
+      valorUnitario: item.valorUnitario,
+      fornecedor: item.fornecedor,
+      localizacao: item.localizacao,
+      minimo: item.minimo
+    });
+    setShowItemModal(true);
+  };
+
+  const handleDeletarItem = async (itemId) => {
+    if (!window.confirm('Tem certeza que deseja deletar este item?')) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await firebase.deleteProduct(currentCnpj, itemId);
+      setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+      
+      if (window.showHeaderNotification) {
+        window.showHeaderNotification('✅ Item Deletado', 'Item removido com sucesso do estoque', 'success');
+      }
+    } catch (err) {
+      console.error('Erro ao deletar item:', err);
+      setError('Erro ao deletar item');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeletarMovimentacao = async (movimentacaoId) => {
+    if (!window.confirm('Tem certeza que deseja deletar esta movimentação?')) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await firebase.deleteMovementRecord(currentCnpj, movimentacaoId);
+      setMovimentacoes(prevMov => prevMov.filter(mov => mov.id !== movimentacaoId));
+      
+      if (window.showHeaderNotification) {
+        window.showHeaderNotification('✅ Movimentação Deletada', 'Registro removido com sucesso', 'success');
+      }
+    } catch (err) {
+      console.error('Erro ao deletar movimentação:', err);
+      setError('Erro ao deletar movimentação');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const gerarPDFMovimentacoes = () => {
+    if (movimentacoes.length === 0) {
+      setError("Nenhuma movimentação para gerar PDF");
+      return;
+    }
+
+    // Criar conteúdo HTML para PDF
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Relatório de Movimentações</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f8fafc; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .entrada { color: #16a34a; font-weight: bold; }
+            .saida { color: #dc2626; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório de Movimentações de Estoque</h1>
+          <p><strong>Data do Relatório:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Responsável</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${movimentacoes.map(mov => `
+                <tr>
+                  <td>${formatarData(mov.data)}</td>
+                  <td class="${mov.tipo === 'Entrada' ? 'entrada' : 'saida'}">${mov.tipo}</td>
+                  <td>${mov.item}</td>
+                  <td>${mov.quantidade}</td>
+                  <td>${mov.responsavel}</td>
+                  <td>${mov.observacao || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Usar uma abordagem simples com window.print() ou criar arquivo
+    const win = window.open('', '', 'height=400,width=800');
+    win.document.write(htmlContent);
+    win.document.close();
+    win.print();
+  };
+
+  const handleSalvarItem = async () => {
+    if (!novoItem.nome || !novoItem.categoria) {
+      setError("Nome e categoria são obrigatórios.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const novoItemData = {
+        ...novoItem,
+        status: getItemStatus(novoItem)
+      };
+
+      if (modoEdicao && itemEmEdicao) {
+        // Modo edição - atualizar item existente
+        await firebase.updateProduct(currentCnpj, itemEmEdicao, novoItemData);
+        
+        // Atualizar lista local
+        setItems(prev => prev.map(item => 
+          item.id === itemEmEdicao 
+            ? { id: itemEmEdicao, ...novoItemData }
+            : item
+        ));
+
+        if (window.showHeaderNotification) {
+          window.showHeaderNotification('✅ Item Atualizado', `${novoItem.nome} foi atualizado com sucesso`, 'success');
+        }
+      } else {
+        // Modo novo - criar novo item
+        const produtoId = await firebase.createProduct(currentCnpj, novoItemData);
+
+        // Adicionar à lista local
+        setItems(prev => [{ id: produtoId, ...novoItemData }, ...prev]);
+
+        if (window.showHeaderNotification) {
+          window.showHeaderNotification('✅ Item Cadastrado', `${novoItem.nome} adicionado ao estoque`, 'success');
+        }
+      }
+
+      // Atualizar categorias
+      if (!categorias.includes(novoItem.categoria)) {
+        setCategorias(prev => [...prev, novoItem.categoria]);
+      }
+
+      // Resetar form
+      setNovoItem({
+        nome: "",
+        categoria: "",
+        quantidade: 0,
+        unidade: "un",
+        valorUnitario: 0,
+        fornecedor: "",
+        localizacao: "",
+        minimo: 0
+      });
+      setModoEdicao(false);
+      setItemEmEdicao(null);
+      setShowItemModal(false);
+
+    } catch (err) {
+      console.error("Erro ao salvar item:", err);
+      setError("Erro ao salvar item");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSalvarCategoria = async () => {
+    if (!novaCategoria.trim()) {
+      setError("Nome da categoria não pode estar vazio.");
+      return;
+    }
+
+    if (categorias.includes(novaCategoria)) {
+      setError("Esta categoria já existe.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Salvar no Firebase
+      await firebase.createCategory(currentCnpj, novaCategoria);
+
+      // Adicionar à lista local
+      setCategorias(prev => [...prev, novaCategoria]);
+
+      // Mostrar notificação
+      if (window.showHeaderNotification) {
+        window.showHeaderNotification('✅ Categoria Criada', `${novaCategoria} foi adicionada com sucesso`, 'success');
+      }
+
+      // Resetar e fechar modal
+      setNovaCategoria("");
+      setShowCategoryModal(false);
+
+    } catch (err) {
+      console.error("Erro ao criar categoria:", err);
+      setError(err.message || "Erro ao criar categoria");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Formatadores
@@ -515,22 +611,25 @@ export default function Estoque() {
       backgroundColor: "white",
       borderRadius: "12px",
       boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-      overflow: "hidden"
+      overflow: "auto",
+      maxWidth: "100%"
     },
     table: {
       width: "100%",
-      borderCollapse: "collapse"
+      borderCollapse: "collapse",
+      minWidth: "1200px"
     },
     tableHeader: {
       backgroundColor: "#f8fafc",
-      padding: "12px 16px",
-      fontSize: "0.75rem",
+      padding: "12px 10px",
+      fontSize: "0.7rem",
       fontWeight: "600",
       color: "#64748b",
       textAlign: "left",
       textTransform: "uppercase",
       letterSpacing: "0.05em",
-      borderBottom: "1px solid #e2e8f0"
+      borderBottom: "1px solid #e2e8f0",
+      whiteSpace: "nowrap"
     },
     tableRow: {
       borderBottom: "1px solid #e2e8f0",
@@ -540,8 +639,8 @@ export default function Estoque() {
       backgroundColor: "#f1f5f9"
     },
     tableCell: {
-      padding: "12px 16px",
-      fontSize: "0.875rem",
+      padding: "10px 8px",
+      fontSize: "0.8rem",
       color: "#334155"
     },
     tableCellHighlight: {
@@ -714,11 +813,46 @@ export default function Estoque() {
   // Componente
   return (
     <div style={styles.container}>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
       {/* Cabeçalho */}
       <header style={styles.header}>
         <h1 style={styles.pageTitle}>Gestão de Estoque</h1>
         <p style={styles.pageSubtitle}>Controle de materiais e insumos para prestação de serviços</p>
       </header>
+
+      {/* Erro */}
+      {error && (
+        <div style={{
+          backgroundColor: "#fee2e2",
+          border: "1px solid #fecaca",
+          color: "#dc2626",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          ❌ {error}
+          <button
+            onClick={() => setError(null)}
+            style={{
+              backgroundColor: "transparent",
+              border: "none",
+              fontSize: "1.2rem",
+              cursor: "pointer",
+              color: "#dc2626"
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Cards de estatísticas */}
       <div style={styles.statsContainer}>
@@ -817,6 +951,7 @@ export default function Estoque() {
           <button 
             style={{...styles.button, ...styles.primaryButton}}
             onClick={handleNovoItem}
+            disabled={isLoading}
           >
             ✚ Novo Item
           </button>
@@ -824,19 +959,25 @@ export default function Estoque() {
           <button 
             style={{...styles.button, ...styles.secondaryButton}}
             onClick={() => handleNovaMovimentacao("entrada")}
+            disabled={isLoading}
           >
-            ↓ Entrada
+            📥 Entrada
           </button>
           
           <button 
             style={{...styles.button, ...styles.dangerButton}}
             onClick={() => handleNovaMovimentacao("saida")}
+            disabled={isLoading}
           >
-            ↑ Saída
+            📤 Saída
           </button>
-          
-          <button style={{...styles.button, ...styles.outlineButton}}>
-            📊 Relatório
+
+          <button 
+            style={{...styles.button, ...styles.outlineButton}}
+            onClick={() => setShowCategoryModal(true)}
+            disabled={isLoading}
+          >
+            🏷️ Categorias
           </button>
         </div>
       </div>
@@ -902,7 +1043,7 @@ export default function Estoque() {
                   <th style={styles.tableHeader}>Valor Total</th>
                   <th style={styles.tableHeader}>Localização</th>
                   <th style={styles.tableHeader}>Status</th>
-                  <th style={styles.tableHeader}>Ações</th>
+                  <th style={{...styles.tableHeader, textAlign: 'center', padding: '12px 4px'}}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -936,33 +1077,49 @@ export default function Estoque() {
                     <td style={styles.tableCell}>
                       <span style={{
                         ...styles.statusBadge,
-                        ...(item.status === "Disponível" ? styles.statusDisponivel : 
-                           item.status === "Baixo Estoque" ? styles.statusBaixo : 
+                        ...(getItemStatus(item) === "Disponível" ? styles.statusDisponivel : 
+                           getItemStatus(item) === "Baixo Estoque" ? styles.statusBaixo : 
                            styles.statusIndisponivel)
                       }}>
-                        {item.status}
+                        {getItemStatus(item)}
                       </span>
                     </td>
-                    <td style={styles.tableCell}>
-                      <div style={styles.actionButtons}>
-                        <button 
-                          style={styles.iconButton}
-                          title="Visualizar detalhes"
+                    <td style={{...styles.tableCell, padding: '8px 4px'}}>
+                      <div style={{display: 'flex', gap: '3px', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap'}}>
+                        <motion.button
+                          style={{
+                            padding: '3px 6px',
+                            fontSize: '0.65rem',
+                            border: 'none',
+                            borderRadius: '3px',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            whiteSpace: 'nowrap'
+                          }}
+                          whileHover={{ backgroundColor: '#2563eb' }}
+                          onClick={() => handleEditarItem(item)}
                         >
-                          👁️
-                        </button>
-                        <button 
-                          style={styles.iconButton}
-                          title="Editar item"
+                          ✏️ Editar
+                        </motion.button>
+                        <motion.button
+                          style={{
+                            padding: '3px 6px',
+                            fontSize: '0.65rem',
+                            border: 'none',
+                            borderRadius: '3px',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            whiteSpace: 'nowrap'
+                          }}
+                          whileHover={{ backgroundColor: '#dc2626' }}
+                          onClick={() => handleDeletarItem(item.id)}
                         >
-                          ✏️
-                        </button>
-                        <button 
-                          style={styles.iconButton}
-                          title="Mais opções"
-                        >
-                          ⋮
-                        </button>
+                          🗑️ Deletar
+                        </motion.button>
                       </div>
                     </td>
                   </motion.tr>
@@ -995,44 +1152,77 @@ export default function Estoque() {
               </div>
             </div>
           ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.tableHeader}>Data</th>
-                  <th style={styles.tableHeader}>Tipo</th>
-                  <th style={styles.tableHeader}>Item</th>
-                  <th style={styles.tableHeader}>Quantidade</th>
-                  <th style={styles.tableHeader}>Responsável</th>
-                  <th style={styles.tableHeader}>Observação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimentacoes.map(mov => (
-                  <motion.tr 
-                    key={mov.id}
-                    style={styles.tableRow}
-                    whileHover={styles.tableRowHover}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <td style={styles.tableCell}>{formatarData(mov.data)}</td>
-                    <td style={styles.tableCell}>
-                      <span style={{
-                        fontWeight: "600",
-                        ...(mov.tipo === "Entrada" ? styles.movimentacaoEntrada : styles.movimentacaoSaida)
-                      }}>
-                        {mov.tipo === "Entrada" ? "↓" : "↑"} {mov.tipo}
-                      </span>
-                    </td>
-                    <td style={{...styles.tableCell, ...styles.tableCellHighlight}}>{mov.item}</td>
-                    <td style={styles.tableCell}>{mov.quantidade}</td>
-                    <td style={styles.tableCell}>{mov.responsavel}</td>
-                    <td style={styles.tableCell}>{mov.observacao}</td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
+            <div>
+              <div style={{display: 'flex', gap: '8px', marginBottom: '16px', justifyContent: 'flex-end'}}>
+                <button 
+                  style={{...styles.button, ...styles.primaryButton}}
+                  onClick={gerarPDFMovimentacoes}
+                  disabled={isLoading}
+                >
+                  📥 Baixar PDF
+                </button>
+              </div>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.tableHeader}>Data</th>
+                    <th style={styles.tableHeader}>Tipo</th>
+                    <th style={styles.tableHeader}>Item</th>
+                    <th style={styles.tableHeader}>Quantidade</th>
+                    <th style={styles.tableHeader}>Responsável</th>
+                    <th style={styles.tableHeader}>Observação</th>
+                    <th style={{...styles.tableHeader, textAlign: 'center', padding: '12px 4px'}}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimentacoes.map(mov => (
+                    <motion.tr 
+                      key={mov.id}
+                      style={styles.tableRow}
+                      whileHover={styles.tableRowHover}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <td style={styles.tableCell}>{formatarData(mov.data)}</td>
+                      <td style={styles.tableCell}>
+                        <span style={{
+                          fontWeight: "600",
+                          ...(mov.tipo === "Entrada" ? styles.movimentacaoEntrada : styles.movimentacaoSaida)
+                        }}>
+                          {mov.tipo === "Entrada" ? "↓" : "↑"} {mov.tipo}
+                        </span>
+                      </td>
+                      <td style={{...styles.tableCell, ...styles.tableCellHighlight}}>{mov.item}</td>
+                      <td style={styles.tableCell}>{mov.quantidade}</td>
+                      <td style={styles.tableCell}>{mov.responsavel}</td>
+                      <td style={styles.tableCell}>{mov.observacao || '-'}</td>
+                      <td style={{...styles.tableCell, padding: '8px 4px'}}>
+                        <div style={{display: 'flex', gap: '3px', justifyContent: 'center', alignItems: 'center'}}>
+                          <motion.button
+                            style={{
+                              padding: '3px 6px',
+                              fontSize: '0.65rem',
+                              border: 'none',
+                              borderRadius: '3px',
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontWeight: '500',
+                              whiteSpace: 'nowrap'
+                            }}
+                            whileHover={{ backgroundColor: '#dc2626' }}
+                            onClick={() => handleDeletarMovimentacao(mov.id)}
+                          >
+                            🗑️ Deletar
+                          </motion.button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -1121,6 +1311,7 @@ export default function Estoque() {
                   ...(tipoMovimentacao === "entrada" ? styles.secondaryButton : styles.dangerButton)
                 }}
                 onClick={handleSalvarMovimentacao}
+                disabled={isLoading}
               >
                 {tipoMovimentacao === "entrada" ? "Registrar Entrada" : "Registrar Saída"}
               </button>
@@ -1139,7 +1330,9 @@ export default function Estoque() {
             transition={{ duration: 0.3 }}
           >
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Cadastrar Novo Item</h2>
+              <h2 style={styles.modalTitle}>
+                {modoEdicao ? '✏️ Editar Item' : '✚ Cadastrar Novo Item'}
+              </h2>
               <button 
                 style={styles.closeButton}
                 onClick={() => setShowItemModal(false)}
@@ -1265,8 +1458,99 @@ export default function Estoque() {
               <button 
                 style={{...styles.button, ...styles.primaryButton}}
                 onClick={handleSalvarItem}
+                disabled={isLoading}
               >
-                Cadastrar Item
+                {modoEdicao ? '💾 Salvar Alterações' : '✚ Cadastrar Item'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de Categorias */}
+      {showCategoryModal && (
+        <div style={styles.modal}>
+          <motion.div 
+            style={styles.modalContent}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>🏷️ Gerenciar Categorias</h2>
+              <button 
+                style={styles.closeButton}
+                onClick={() => setShowCategoryModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Nova Categoria</label>
+                <input 
+                  type="text"
+                  style={styles.input}
+                  value={novaCategoria}
+                  onChange={(e) => setNovaCategoria(e.target.value)}
+                  placeholder="Ex: Eletrônicos, Peças, Acessórios..."
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSalvarCategoria();
+                    }
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label style={styles.label}>Categorias Existentes</label>
+                <div style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px"
+                }}>
+                  {categorias
+                    .filter(cat => cat !== "Todas")
+                    .map(categoria => (
+                    <div
+                      key={categoria}
+                      style={{
+                        backgroundColor: "#e0f2fe",
+                        border: "1px solid #0284c7",
+                        color: "#0c4a6e",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        fontSize: "0.875rem",
+                        fontWeight: "500",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}
+                    >
+                      {categoria}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div style={styles.modalFooter}>
+              <button 
+                style={{...styles.button, ...styles.outlineButton}}
+                onClick={() => {
+                  setNovaCategoria("");
+                  setShowCategoryModal(false);
+                }}
+              >
+                Fechar
+              </button>
+              <button 
+                style={{...styles.button, ...styles.primaryButton}}
+                onClick={handleSalvarCategoria}
+                disabled={isLoading || !novaCategoria.trim()}
+              >
+                ➕ Adicionar Categoria
               </button>
             </div>
           </motion.div>
