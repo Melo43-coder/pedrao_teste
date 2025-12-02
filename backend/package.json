@@ -1,7 +1,7 @@
 {
-  "name": "smartops-backend",
+  "name": "assistus-backend",
   "version": "1.0.0",
-  "description": "Backend for SmartOps WhatsApp integration",
+  "description": "Backend for Assistus WhatsApp integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

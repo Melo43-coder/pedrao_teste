@@ -463,7 +463,7 @@ export default function Dashboard() {
       }}>
         <div>
           <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "4px" }}>
-            SmartOps Pro
+            Assistus Pro
             <span style={{ 
               backgroundColor: theme.highlight, 
               color: "white", 

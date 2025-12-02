@@ -228,7 +228,7 @@ export default function Chat() {
         // Enviar resposta da IA como uma mensagem do sistema
         await firebase.sendMessage(cnpj, chatSelecionado.id, {
           cpfEnvio: 'ia-bot',
-          nomeEnvio: '🤖 IA SmartOps',
+          nomeEnvio: '🤖 IA Assistus',
           conteudo: respostaIA,
           tipo: 'texto'
         });

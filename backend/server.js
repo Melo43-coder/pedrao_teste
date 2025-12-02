@@ -257,7 +257,7 @@ app.post('/api/zoe/process-message', async (req, res) => {
     console.log('📚 Histórico preparado:', conversationHistory.length, 'mensagens');
 
     // Prompt do sistema para ZOE
-    const systemPrompt = `Você é ZOE, uma assistente de atendimento ao cliente da empresa Zillo. 
+    const systemPrompt = `Você é ZOE, uma assistente de atendimento ao cliente da empresa Assistus. 
 Sua responsabilidade é conversar de forma natural, amigável e profissional com clientes enquanto eles aguardam um prestador de serviço.
 
 Características:
@@ -271,7 +271,7 @@ Características:
 - Seja breve mas informativo
 
 Contexto da empresa:
-- Empresa: Zillo
+- Empresa: Assistus
 - Tipo de serviço: ${contextoOS?.tipo || 'Serviços em geral'}
 - Cliente: ${contextoOS?.clienteNome || 'Cliente'}
 

@@ -49,7 +49,7 @@ const Breadcrumb = () => {
   if (activePath === "perfil") {
     return (
       <div className="breadcrumb">
-        <span className="breadcrumb-home">SmartOps</span>
+        <span className="breadcrumb-home">Assistus</span>
         <span className="breadcrumb-separator">/</span>
         <span className="breadcrumb-current">Meu Perfil</span>
       </div>
@@ -60,7 +60,7 @@ const Breadcrumb = () => {
 
   return (
     <div className="breadcrumb">
-      <span className="breadcrumb-home">SmartOps</span>
+      <span className="breadcrumb-home">Assistus</span>
       <span className="breadcrumb-separator">/</span>
       {currentMenu && (
         <span className="breadcrumb-current">
@@ -96,7 +96,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const userName = localStorage.getItem("userName") || "Usuário";
-  const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
+  const userEmail = localStorage.getItem("userEmail") || "usuario@assistus.com";
   const userInitial = userName.charAt(0).toUpperCase();
   const userRole = localStorage.getItem('userRole') || 'user';
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
@@ -120,7 +120,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
       <div className="logo-container">
         <h1 className="logo">
           <span className="logo-icon">S</span>
-          SmartOps
+          Assistus
         </h1>
       </div>
       

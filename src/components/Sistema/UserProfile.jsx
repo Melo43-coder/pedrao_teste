@@ -18,7 +18,7 @@ const UserProfile = () => {
   useEffect(() => {
     // Simulando dados do usuário
     const userName = localStorage.getItem("userName") || "Usuário";
-    const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
+    const userEmail = localStorage.getItem("userEmail") || "usuario@assistus.com";
     
     // Dados fictícios para demonstração
     const mockUserData = {
