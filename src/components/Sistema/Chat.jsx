@@ -17,11 +17,15 @@ export default function Chat() {
   const [usuarios, setUsuarios] = useState([]);
   const [usuarioAtual, setUsuarioAtual] = useState(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [zoeRespostas, setZoeRespostas] = useState({});
+  const [zoeLoading, setZoeLoading] = useState({});
   
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
   const userRole = localStorage.getItem('userRole') || 'user';
   const userName = localStorage.getItem('userName') || 'Usuário';
   const messagesEndRef = useRef(null);
+  const timeoutZoeRef = useRef({});
+  const ultimaMsgTrackerRef = useRef({});
 
   // Carregar dados ao montar o componente
   useEffect(() => {
@@ -65,6 +69,134 @@ export default function Chat() {
       clearInterval(interval);
     };
   }, [chatSelecionado?.id]); // Só reiniciar se o chat mudar
+
+  // Monitorar mensagens e acionar Zoé
+  useEffect(() => {
+    if (!chatSelecionado || mensagens.length === 0) {
+      console.log('⏭️ Zoé skipped: chat:', !!chatSelecionado, 'msgs:', mensagens.length);
+      return;
+    }
+
+    const ultimaMensagem = mensagens[mensagens.length - 1];
+    if (!ultimaMensagem) {
+      console.log('❌ Nenhuma mensagem');
+      return;
+    }
+
+    // Verificar se é uma mensagem de cliente
+    const isClienteMessage = ultimaMensagem.cpfEnvio?.includes('cliente-') || 
+                            (chatSelecionado.tipo?.includes('whatsapp') && ultimaMensagem.whatsapp);
+    
+    console.log('📊 Verificando mensagem:', {
+      id: ultimaMensagem.id,
+      isCliente: isClienteMessage,
+      cpfEnvio: ultimaMensagem.cpfEnvio,
+      tipo: chatSelecionado.tipo
+    });
+
+    if (!isClienteMessage) {
+      console.log('⏭️ Não é mensagem de cliente');
+      return;
+    }
+
+    const msgKey = `${chatSelecionado.id}_${ultimaMensagem.id}`;
+    
+    // Verificar se Zoé já respondeu a esta mensagem
+    if (ultimaMsgTrackerRef.current[chatSelecionado.id] === msgKey) {
+      console.log('⏳ Zoé já respondeu, aguardando 15 segundos para responder novamente...');
+      
+      // Mesmo que já tenha respondido, agendar nova resposta após 15 segundos
+      if (timeoutZoeRef.current[chatSelecionado.id]) {
+        clearTimeout(timeoutZoeRef.current[chatSelecionado.id]);
+      }
+      
+      timeoutZoeRef.current[chatSelecionado.id] = setTimeout(async () => {
+        console.log('⏰ 15 segundos passaram! Zoé vai responder novamente...');
+        const msgsMaisRecentes = await carregarMensagens(chatSelecionado.id);
+        
+        if (!msgsMaisRecentes || msgsMaisRecentes.length === 0) return;
+
+        let temRespostaProvider = false;
+        for (let i = msgsMaisRecentes.length - 1; i >= 0; i--) {
+          if (msgsMaisRecentes[i].id === ultimaMensagem.id) {
+            break;
+          }
+          const msgAtual = msgsMaisRecentes[i];
+          if (!msgAtual.cpfEnvio?.includes('cliente-') && msgAtual.cpfEnvio !== 'zoe-assistente' && msgAtual.cpfEnvio !== 'ia-bot') {
+            console.log('⚠️ Provider respondeu!');
+            temRespostaProvider = true;
+            break;
+          }
+        }
+
+        if (!temRespostaProvider) {
+          console.log('🚀 ACIONANDO ZOÉ NOVAMENTE (2ª resposta)!');
+          await processarComZoe(ultimaMensagem);
+        } else {
+          console.log('⏭️ Provider respondeu, Zoé não precisa responder novamente');
+        }
+      }, 15000); // 15 segundos
+      
+      return;
+    }
+
+    // Marcar como processada
+    console.log('🔔 Marcando para Zoé processar:', msgKey);
+    ultimaMsgTrackerRef.current[chatSelecionado.id] = msgKey;
+
+    // Limpar timeout anterior se existir
+    if (timeoutZoeRef.current[chatSelecionado.id]) {
+      clearTimeout(timeoutZoeRef.current[chatSelecionado.id]);
+    }
+
+    // Agendar resposta de Zoé após 5 segundos
+    console.log('⏱️ Agendando Zoé em 5 segundos...');
+    timeoutZoeRef.current[chatSelecionado.id] = setTimeout(async () => {
+      console.log('⏰ 5 segundos passaram! Verificando se provider respondeu...');
+      // Verificar se provider respondeu
+      const msgsMaisRecentes = await carregarMensagens(chatSelecionado.id);
+      
+      if (!msgsMaisRecentes || msgsMaisRecentes.length === 0) {
+        console.log('❌ Nenhuma mensagem encontrada');
+        return;
+      }
+
+      // Verificar se há alguma mensagem do provider após a última do cliente
+      let temRespostaProvider = false;
+      for (let i = msgsMaisRecentes.length - 1; i >= 0; i--) {
+        if (msgsMaisRecentes[i].id === ultimaMensagem.id) {
+          // Chegou na mensagem do cliente, se não achou provider, ativar Zoé
+          console.log('✅ Chegou na mensagem original. Provider não respondeu!');
+          break;
+        }
+        const msgAtual = msgsMaisRecentes[i];
+        console.log('🔍 Verificando:', {
+          msgId: msgAtual.id,
+          cpfEnvio: msgAtual.cpfEnvio,
+          isProvider: !msgAtual.cpfEnvio?.includes('cliente-') && msgAtual.cpfEnvio !== 'zoe-assistente'
+        });
+        if (!msgAtual.cpfEnvio?.includes('cliente-') && msgAtual.cpfEnvio !== 'zoe-assistente') {
+          console.log('⚠️ Provider respondeu!');
+          temRespostaProvider = true;
+          break;
+        }
+      }
+
+      if (!temRespostaProvider) {
+        // Provider não respondeu, ativar Zoé
+        console.log('🚀 ACIONANDO ZOÉ!');
+        await processarComZoe(ultimaMensagem);
+      } else {
+        console.log('⏭️ Provider já respondeu, Zoé não precisa atuar');
+      }
+    }, 5000); // 5 segundos
+
+    return () => {
+      if (timeoutZoeRef.current[chatSelecionado.id]) {
+        clearTimeout(timeoutZoeRef.current[chatSelecionado.id]);
+      }
+    };
+  }, [chatSelecionado?.id, mensagens, chatSelecionado]);
 
   const carregarChats = async () => {
     try {
@@ -196,6 +328,106 @@ export default function Chat() {
     return null;
   };
 
+  // Processar mensagem com Zoé
+  const processarComZoe = async (mensagemCliente) => {
+    if (!chatSelecionado) {
+      console.log('❌ Chat não selecionado');
+      return;
+    }
+
+    try {
+      console.log('🤖 Iniciando Zoé para:', mensagemCliente.conteudo);
+      setZoeLoading(prev => ({ ...prev, [chatSelecionado.id]: true }));
+
+      const historicoMsgs = mensagens.map(m => ({
+        role: m.cpfEnvio === userName ? 'user' : 'assistant',
+        content: m.conteudo
+      }));
+
+      console.log('📤 Enviando para /api/zoe/process-message:', {
+        mensagem: mensagemCliente.conteudo,
+        telefoneCliente: chatSelecionado.telefone || 'desconhecido',
+        contextoOS: chatSelecionado
+      });
+
+      const response = await fetch('http://localhost:3001/api/zoe/process-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mensagem: mensagemCliente.conteudo,
+          telefoneCliente: chatSelecionado.telefone || 'desconhecido',
+          historico: historicoMsgs,
+          contextoOS: {
+            chatId: chatSelecionado.id,
+            clienteNome: chatSelecionado.clienteNome || 'Cliente',
+            tipo: chatSelecionado.tipo
+          }
+        })
+      });
+
+      console.log('📥 Resposta do servidor:', response.status);
+      const data = await response.json();
+      console.log('✅ Data recebida:', data);
+
+      if (data.success && data.resposta) {
+        // Salvar resposta da Zoé no Firebase
+        const cnpj = localStorage.getItem('companyCnpj');
+        
+        console.log('💾 Salvando mensagem Zoé no Firebase...');
+        console.log('   CNPJ:', cnpj);
+        console.log('   Chat ID:', chatSelecionado.id);
+        console.log('   Conteúdo:', data.resposta);
+        
+        try {
+          const messagemZoe = {
+            cpfEnvio: 'zoe-assistente',
+            nomeEnvio: '👩‍💼 ZOE',
+            conteudo: data.resposta,
+            tipo: 'texto'
+          };
+          
+          const resultado = await firebase.sendMessage(cnpj, chatSelecionado.id, messagemZoe);
+          console.log('✅ Mensagem Zoé salva! ID:', resultado.id);
+          
+          // 📱 ENVIAR PARA WHATSAPP DO CLIENTE
+          if (chatSelecionado.tipo?.includes('whatsapp') && chatSelecionado.telefone) {
+            console.log('📱 Enviando resposta de Zoé via WhatsApp para:', chatSelecionado.telefone);
+            try {
+              const resWhatsApp = await firebase.sendWhatsAppMessage(cnpj, chatSelecionado.telefone, data.resposta);
+              console.log('✅ Mensagem WhatsApp enviada:', resWhatsApp);
+            } catch (whatsappErr) {
+              console.warn('⚠️ Erro ao enviar via WhatsApp:', whatsappErr.message);
+              // Não bloqueia - a mensagem já foi salva no chat
+            }
+          } else {
+            console.log('ℹ️ Chat não é WhatsApp, apenas salvo no sistema');
+          }
+          
+          // Verificar se foi realmente salva
+          const mensagensAtualizadas = await firebase.listMessages(cnpj, chatSelecionado.id);
+          console.log('📊 Total de mensagens agora:', mensagensAtualizadas.length);
+          console.log('📋 Última mensagem:', mensagensAtualizadas[mensagensAtualizadas.length - 1]);
+        } catch (firebaseErr) {
+          console.error('❌ Erro ao salvar no Firebase:', firebaseErr);
+          // Mesmo com erro, marcar que foi processado
+          setZoeRespostas(prev => ({ ...prev, [chatSelecionado.id]: data.resposta }));
+        }
+        
+        // Aguardar um pouco e recarregar mensagens
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('🔄 Recarregando mensagens...');
+        const msgCarregadas = await carregarMensagens(chatSelecionado.id);
+        console.log('📊 Mensagens carregadas:', msgCarregadas?.length);
+      } else {
+        console.log('❌ Resposta vazia ou sem sucesso:', data);
+      }
+    } catch (err) {
+      console.error('❌ Erro ao processar Zoé:', err);
+    } finally {
+      setZoeLoading(prev => ({ ...prev, [chatSelecionado.id]: false }));
+    }
+  };
+
   const handleSelecionarChat = (chat) => {
     setChatSelecionado(chat);
     carregarMensagens(chat.id);
@@ -210,51 +442,27 @@ export default function Chat() {
       
       console.log('📨 Enviando mensagem:', { chat: chatSelecionado.titulo, msg: novaMsg });
       
-      // Detectar se é uma mensagem para a IA
-      const respostaIA = await detectarEProcessarIA(novaMsg, cnpj);
-      
-      if (respostaIA) {
-        // Mensagem foi para IA, adicionar ambas ao chat
-        console.log('✅ Resposta da IA recebida');
-        
-        // Enviar mensagem do usuário
-        await firebase.sendMessage(cnpj, chatSelecionado.id, {
-          cpfEnvio: userNameMsg,
-          nomeEnvio: userNameMsg,
-          conteudo: novaMsg,
-          tipo: 'texto'
-        });
+      // Enviar mensagem normal
+      await firebase.sendMessage(cnpj, chatSelecionado.id, {
+        cpfEnvio: userNameMsg,
+        nomeEnvio: userNameMsg,
+        conteudo: novaMsg,
+        tipo: 'texto'
+      });
 
-        // Enviar resposta da IA como uma mensagem do sistema
-        await firebase.sendMessage(cnpj, chatSelecionado.id, {
-          cpfEnvio: 'ia-bot',
-          nomeEnvio: '🤖 IA SmartOps',
-          conteudo: respostaIA,
-          tipo: 'texto'
-        });
-      } else {
-        // Mensagem normal para o chat
-        await firebase.sendMessage(cnpj, chatSelecionado.id, {
-          cpfEnvio: userNameMsg,
-          nomeEnvio: userNameMsg,
-          conteudo: novaMsg,
-          tipo: 'texto'
-        });
-
-        // Se for conversa via WhatsApp, enviar também para o WhatsApp
-        if (chatSelecionado.tipo === 'whatsapp' || chatSelecionado.tipo === 'cliente-whatsapp') {
-          const telefone = chatSelecionado.telefone;
-          console.log('📱 Chat é WhatsApp. Telefone:', telefone);
-          if (telefone) {
-            console.log('🔄 Acionando envio WhatsApp...');
-            const whatsappResult = await firebase.sendWhatsAppMessage(cnpj, telefone, novaMsg);
-            console.log('📲 Resultado WhatsApp:', whatsappResult);
-          } else {
-            console.warn('⚠️ Chat é WhatsApp mas não tem telefone');
-          }
+      // Se for conversa via WhatsApp, enviar também para o WhatsApp
+      if (chatSelecionado.tipo === 'whatsapp' || chatSelecionado.tipo === 'cliente-whatsapp') {
+        const telefone = chatSelecionado.telefone;
+        console.log('📱 Chat é WhatsApp. Telefone:', telefone);
+        if (telefone) {
+          console.log('🔄 Acionando envio WhatsApp...');
+          const whatsappResult = await firebase.sendWhatsAppMessage(cnpj, telefone, novaMsg);
+          console.log('📲 Resultado WhatsApp:', whatsappResult);
         } else {
-          console.log('💬 Chat é interno (não WhatsApp)');
+          console.warn('⚠️ Chat é WhatsApp mas não tem telefone');
         }
+      } else {
+        console.log('💬 Chat é interno (não WhatsApp)');
       }
       
       setNovaMsg('');
@@ -859,6 +1067,7 @@ export default function Chat() {
                     mensagens.map((msg) => {
                       const userNameAtual = localStorage.getItem('userName');
                       const isEnviada = msg.cpfEnvio === userNameAtual;
+                      const isZoe = msg.cpfEnvio === 'zoe-assistente';
 
                       return (
                         <motion.div
@@ -875,7 +1084,7 @@ export default function Chat() {
                           <motion.div
                             style={{
                               ...styles.mensagem,
-                              ...(isEnviada ? styles.mensagemEnviada : styles.mensagemRecebida)
+                              ...(isZoe ? { backgroundColor: '#fef08a', border: '2px solid #eab308' } : isEnviada ? styles.mensagemEnviada : styles.mensagemRecebida)
                             }}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -996,6 +1205,71 @@ export default function Chat() {
                       );
                     })
                   )}
+                  
+                  {/* Indicador de Zoé digitando */}
+                  {zoeLoading[chatSelecionado?.id] && (
+                    <motion.div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        marginBottom: '16px',
+                        alignItems: 'flex-start'
+                      }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <motion.div
+                        style={{
+                          maxWidth: '70%',
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '0.7rem',
+                          fontWeight: '700',
+                          color: '#000000',
+                          marginBottom: '6px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          opacity: 0.8,
+                          width: '100%'
+                        }}>
+                          👩‍💼 ZOE
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>ZOE está digitando</span>
+                          <motion.span
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            •
+                          </motion.span>
+                          <motion.span
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            •
+                          </motion.span>
+                          <motion.span
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            •
+                          </motion.span>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                  
                   <div ref={messagesEndRef} />
                 </div>
 

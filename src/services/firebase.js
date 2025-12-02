@@ -1023,6 +1023,261 @@ export async function getMonthSatisfactionAverage(cnpj, mes = null, ano = null) 
   }
 }
 
+// ===== AUTOMAÇÃO (IA GEMINI INTEGRATION) =====
+
+/**
+ * ✅ ESTRUTURA: companies/{cnpj}/automacao/
+ *   ├─ regras/ (Automation Rules)
+ *   ├─ fluxoTrabalho/ (Workflow)
+ *   ├─ insights/ (AI Insights)
+ *   └─ previsoes/ (AI Forecasts)
+ */
+
+// REGRAS DE AUTOMAÇÃO
+export async function criarRegraAutomacao(cnpj, regraData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const regraRef = collection(db, 'companies', companyId, 'automacao', 'regras', 'items');
+    const docRef = await addDoc(regraRef, {
+      ...regraData,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+      status: regraData.status || 'Ativo'
+    });
+    
+    console.log(`✅ Regra de automação criada: ${docRef.id}`);
+    return { id: docRef.id, ...regraData };
+  } catch (err) {
+    console.error('❌ Erro ao criar regra:', err);
+    throw err;
+  }
+}
+
+export async function listarRegrasAutomacao(cnpj) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const regraRef = collection(db, 'companies', companyId, 'automacao', 'regras', 'items');
+    const q = query(regraRef, orderBy('prioridade', 'asc'));
+    const snapshot = await getDocs(q);
+    
+    const regras = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${regras.length} regras de automação carregadas`);
+    return regras;
+  } catch (err) {
+    console.error('❌ Erro ao listar regras:', err);
+    return [];
+  }
+}
+
+export async function atualizarRegraAutomacao(cnpj, regraId, updateData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const regraRef = doc(db, 'companies', companyId, 'automacao', 'regras', 'items', regraId);
+    await updateDoc(regraRef, {
+      ...updateData,
+      atualizadoEm: new Date().toISOString()
+    });
+    
+    console.log(`✅ Regra ${regraId} atualizada`);
+    return { id: regraId, ...updateData };
+  } catch (err) {
+    console.error('❌ Erro ao atualizar regra:', err);
+    throw err;
+  }
+}
+
+export async function deletarRegraAutomacao(cnpj, regraId) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const regraRef = doc(db, 'companies', companyId, 'automacao', 'regras', 'items', regraId);
+    await deleteDoc(regraRef);
+    
+    console.log(`✅ Regra ${regraId} deletada`);
+    return { id: regraId, deleted: true };
+  } catch (err) {
+    console.error('❌ Erro ao deletar regra:', err);
+    throw err;
+  }
+}
+
+// FLUXO DE TRABALHO
+export async function criarFluxoTrabalho(cnpj, fluxoData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const fluxoRef = collection(db, 'companies', companyId, 'automacao', 'fluxoTrabalho', 'items');
+    const docRef = await addDoc(fluxoRef, {
+      ...fluxoData,
+      criadoEm: new Date().toISOString(),
+      status: fluxoData.status || 'Ativo'
+    });
+    
+    console.log(`✅ Fluxo de trabalho criado: ${docRef.id}`);
+    return { id: docRef.id, ...fluxoData };
+  } catch (err) {
+    console.error('❌ Erro ao criar fluxo:', err);
+    throw err;
+  }
+}
+
+export async function listarFluxoTrabalho(cnpj) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const fluxoRef = collection(db, 'companies', companyId, 'automacao', 'fluxoTrabalho', 'items');
+    const snapshot = await getDocs(fluxoRef);
+    
+    const fluxos = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${fluxos.length} fluxos de trabalho carregados`);
+    return fluxos;
+  } catch (err) {
+    console.error('❌ Erro ao listar fluxos:', err);
+    return [];
+  }
+}
+
+// INSIGHTS (IA)
+export async function criarInsight(cnpj, insightData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const insightRef = collection(db, 'companies', companyId, 'automacao', 'insights', 'items');
+    const docRef = await addDoc(insightRef, {
+      ...insightData,
+      criadoEm: new Date().toISOString(),
+      geradoPorIA: true
+    });
+    
+    console.log(`✅ Insight criado: ${docRef.id}`);
+    return { id: docRef.id, ...insightData };
+  } catch (err) {
+    console.error('❌ Erro ao criar insight:', err);
+    throw err;
+  }
+}
+
+export async function listarInsights(cnpj, limite = 10) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const insightRef = collection(db, 'companies', companyId, 'automacao', 'insights', 'items');
+    const q = query(insightRef, orderBy('criadoEm', 'desc'), limit(limite));
+    const snapshot = await getDocs(q);
+    
+    const insights = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${insights.length} insights carregados`);
+    return insights;
+  } catch (err) {
+    console.error('❌ Erro ao listar insights:', err);
+    return [];
+  }
+}
+
+// PREVISÕES (IA)
+export async function criarPrevisao(cnpj, previsaoData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const previsaoRef = collection(db, 'companies', companyId, 'automacao', 'previsoes', 'items');
+    const docRef = await addDoc(previsaoRef, {
+      ...previsaoData,
+      criadoEm: new Date().toISOString(),
+      geradoPorIA: true
+    });
+    
+    console.log(`✅ Previsão criada: ${docRef.id}`);
+    return { id: docRef.id, ...previsaoData };
+  } catch (err) {
+    console.error('❌ Erro ao criar previsão:', err);
+    throw err;
+  }
+}
+
+export async function listarPrevisoes(cnpj, limite = 10) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const previsaoRef = collection(db, 'companies', companyId, 'automacao', 'previsoes', 'items');
+    const q = query(previsaoRef, orderBy('criadoEm', 'desc'), limit(limite));
+    const snapshot = await getDocs(q);
+    
+    const previsoes = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${previsoes.length} previsões carregadas`);
+    return previsoes;
+  } catch (err) {
+    console.error('❌ Erro ao listar previsões:', err);
+    return [];
+  }
+}
+
+// DASHBOARD AUTOMAÇÃO (Agregado)
+export async function obterDashboardAutomacao(cnpj) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const [regras, fluxos, insights, previsoes, servicos, satisfacao] = await Promise.all([
+      listarRegrasAutomacao(cnpj),
+      listarFluxoTrabalho(cnpj),
+      listarInsights(cnpj, 5),
+      listarPrevisoes(cnpj, 5),
+      listServiceOrders(cnpj),
+      getSatisfactionRatings(cnpj)
+    ]);
+    
+    return {
+      regras,
+      fluxos,
+      insights,
+      previsoes,
+      servicos,
+      satisfacao,
+      resumo: {
+        totalRegras: regras.length,
+        totalFluxos: fluxos.length,
+        totalServicos: servicos.length,
+        servicosConcluidos: servicos.filter(s => s.status === 'Concluída').length,
+        mediaAvaliacao: satisfacao.length > 0 
+          ? (satisfacao.reduce((a, b) => a + b.nota, 0) / satisfacao.length).toFixed(1)
+          : 'N/A'
+      }
+    };
+  } catch (err) {
+    console.error('❌ Erro ao obter dashboard:', err);
+    throw err;
+  }
+}
+
 export default { 
   identifyCnpj, 
   checkUser, 
@@ -1090,5 +1345,17 @@ export default {
   // Satisfação functions
   saveSatisfactionRating,
   getSatisfactionRatings,
-  getMonthSatisfactionAverage
+  getMonthSatisfactionAverage,
+  // Automação functions (IA Integration)
+  criarRegraAutomacao,
+  listarRegrasAutomacao,
+  atualizarRegraAutomacao,
+  deletarRegraAutomacao,
+  criarFluxoTrabalho,
+  listarFluxoTrabalho,
+  criarInsight,
+  listarInsights,
+  criarPrevisao,
+  listarPrevisoes,
+  obterDashboardAutomacao
 };

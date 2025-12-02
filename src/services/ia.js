@@ -1,73 +1,105 @@
 import * as firebase from './firebase';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const GEMINI_API_KEY = 'AIzaSyCAShzEkAO5CMy5FF8NIczNEN4TtrKjsrw';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-
-/**
- * Processa mensagens com IA inteligente usando Google Gemini
- * Acessa dados reais do Firebase e segue regras de automação
- */
 export async function processarMensagemIAInteligente(mensagem, cnpj, regrasAutomacao = []) {
-  if (!mensagem.trim() || !cnpj) return 'Erro: dados inválidos';
+  // Validação de segurança - sem CNPJ, sem acesso aos dados
+  if (!mensagem.trim() || !cnpj) {
+    return '⚠️ Erro: CNPJ não fornecido. Não é possível acessar dados sem identificação da empresa.';
+  }
 
   try {
-    // Buscar dados reais do Firebase
-    const ordensServico = await firebase.listServiceOrders(cnpj);
-    const avaliacoes = await firebase.getSatisfactionRatings(cnpj);
-    const regrasAtivas = regrasAutomacao.filter(r => r.status === 'Ativo');
+    console.log(`🔐 IA Frontend - Processando para CNPJ: ${cnpj}`);
+
+    // ✅ SEGURANÇA: Buscar APENAS dados do CNPJ configurado do Firebase
+    const [
+      ordensServico,
+      avaliacoes,
+      regrasAutomacaoFirebase,
+      fluxoTrabalho,
+      insights,
+      previsoes,
+      dashboardAutomacao
+    ] = await Promise.all([
+      firebase.listServiceOrders(cnpj),
+      firebase.getSatisfactionRatings(cnpj),
+      firebase.listarRegrasAutomacao(cnpj),
+      firebase.listarFluxoTrabalho(cnpj),
+      firebase.listarInsights(cnpj, 3),
+      firebase.listarPrevisoes(cnpj, 3),
+      firebase.obterDashboardAutomacao(cnpj)
+    ]);
 
     // Análise inteligente baseada em dados reais
     const ordensCompletas = ordensServico.filter(o => o.status === 'Concluída').length;
     const ordensPendentes = ordensServico.filter(o => o.status === 'Pendente').length;
     const ordensAndamento = ordensServico.filter(o => o.status === 'Em andamento').length;
-    const taxaConclusao = ordensServico.length > 0 ? ((ordensCompletas / ordensServico.length) * 100).toFixed(1) : 0;
+    const ordensAtraso = ordensServico.filter(o => {
+      const dataLimite = new Date(o.dataAgendamento);
+      return new Date() > dataLimite && o.status !== 'Concluída';
+    }).length;
+    
+    const taxaConclusao = ordensServico.length > 0 
+      ? ((ordensCompletas / ordensServico.length) * 100).toFixed(1) 
+      : 0;
+    
     const mediaAvaliacao = avaliacoes.length > 0 
       ? (avaliacoes.reduce((a, b) => a + b.nota, 0) / avaliacoes.length).toFixed(1)
-      : 'N/A';
+      : 'Sem avaliações';
 
-    // Criar contexto para o Gemini com dados reais do negócio
-    const contexto = `
-Você é um Assistente IA Gestora da plataforma SmartOps. 
-Você tem acesso aos dados reais do negócio do usuário:
+    console.log(`📤 Enviando para IA Backend...`);
 
-📊 DADOS ATUAIS DO NEGÓCIO:
-- Total de Ordens de Serviço: ${ordensServico.length}
-- Ordens Concluídas: ${ordensCompletas}
-- Ordens em Andamento: ${ordensAndamento}
-- Ordens Pendentes: ${ordensPendentes}
-- Taxa de Conclusão: ${taxaConclusao}%
-- Satisfação do Cliente: ${mediaAvaliacao}/10
-- Total de Avaliações: ${avaliacoes.length}
+    // ✅ Chamar endpoint backend seguro que processa com Gemini
+    const backendResponse = await fetch('http://localhost:3001/api/ia/process-message', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        mensagem: mensagem,
+        cnpj: cnpj,
+        context: {
+          ordensServico: ordensServico.length,
+          ordensCompletas: ordensCompletas,
+          ordensPendentes: ordensPendentes,
+          ordensAndamento: ordensAndamento,
+          ordensAtraso: ordensAtraso,
+          taxaConclusao: taxaConclusao,
+          mediaAvaliacao: mediaAvaliacao,
+          regrasAutomacao: regrasAutomacaoFirebase.length,
+          fluxoTrabalho: fluxoTrabalho.length,
+          insights: insights.length,
+          previsoes: previsoes.length
+        }
+      })
+    });
 
-⚙️ AUTOMAÇÕES ATIVAS (${regrasAtivas.length}):
-${regrasAtivas.map(r => `- ${r.nome}: ${r.descricao}`).join('\n')}
+    if (!backendResponse.ok) {
+      const errorData = await backendResponse.json();
+      throw new Error(errorData.error || 'Erro ao chamar IA Backend');
+    }
 
-INSTRUÇÕES:
-1. Sempre cite os dados reais do negócio quando responder
-2. Faça recomendações baseadas nos números reais
-3. Se questionado sobre automações, liste as regras ativas
-4. Seja prático, direto e focado em soluções
-5. Sempre use emojis para melhor visualização
-6. Se não souber algo, seja honesto e pergunte mais
+    const data = await backendResponse.json();
+    const resposta = data.response;
 
-PERGUNTA DO USUÁRIO: ${mensagem}
+    console.log(`✅ Resposta gerada com sucesso para CNPJ: ${cnpj}`);
+    
+    // Opcional: Salvar insights gerados pela IA
+    if (resposta.includes('insight') || resposta.includes('recomendação')) {
+      try {
+        await firebase.criarInsight(cnpj, {
+          titulo: 'Insight da Conversa',
+          descricao: resposta.substring(0, 200),
+          conteudo: resposta,
+          tipo: 'conversacional'
+        });
+      } catch (err) {
+        console.warn('⚠️ Não foi possível salvar insight:', err);
+      }
+    }
 
-Responda de forma prática, citando dados reais e oferecendo recomendações acionáveis.
-    `;
-
-    console.log('🤖 Enviando para Gemini:', contexto.substring(0, 200) + '...');
-
-    // Chamar a API do Gemini
-    const result = await model.generateContent(contexto);
-    const response = await result.response;
-    const resposta = response.text();
-
-    console.log('✅ Resposta do Gemini recebida');
     return resposta;
+
   } catch (error) {
-    console.error('❌ Erro na IA:', error);
-    return `⚠️ Erro ao processar com IA: ${error.message}. Tente novamente.`;
+    console.error(`❌ Erro ao processar IA para CNPJ ${cnpj}:`, error);
+    return `⚠️ Não consegui processar sua solicitação no momento. Erro: ${error.message}. Certifique-se de que o servidor backend está rodando em http://localhost:3001`;
   }
 }

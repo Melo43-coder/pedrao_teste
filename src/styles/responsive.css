@@ -1,0 +1,551 @@
+/* ============================================
+   RESPONSIVE GLOBAL STYLESHEET
+   Responsividade para todas as telas
+   ============================================ */
+
+/* Reset e estilos base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* Container principal */
+.system-container,
+[role="main"] {
+  width: 100vw;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   DESKTOP - 1920px e acima
+   ============================================ */
+@media (min-width: 1920px) {
+  body {
+    font-size: 16px;
+  }
+  
+  .container {
+    max-width: 1920px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 24px;
+  }
+  
+  table {
+    font-size: 14px;
+  }
+  
+  th, td {
+    padding: 16px !important;
+  }
+}
+
+/* ============================================
+   LARGE DESKTOP - 1440px a 1919px
+   ============================================ */
+@media (min-width: 1440px) and (max-width: 1919px) {
+  body {
+    font-size: 15px;
+  }
+  
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  
+  table {
+    font-size: 13px;
+  }
+  
+  th, td {
+    padding: 14px !important;
+  }
+}
+
+/* ============================================
+   DESKTOP NORMAL - 1024px a 1439px
+   ============================================ */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  body {
+    font-size: 14px;
+  }
+  
+  .container {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  
+  .sidebar {
+    min-width: 240px !important;
+    width: 240px !important;
+  }
+  
+  .main-content {
+    flex: 1;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  
+  table {
+    font-size: 12px;
+  }
+  
+  th, td {
+    padding: 12px !important;
+  }
+}
+
+/* ============================================
+   TABLET LANDSCAPE - 768px a 1023px
+   ============================================ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  body {
+    font-size: 13px;
+  }
+  
+  .container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 12px;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  
+  .sidebar {
+    min-width: 200px !important;
+    width: 200px !important;
+  }
+  
+  .main-content {
+    flex: 1;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  
+  table {
+    font-size: 11px;
+    overflow-x: auto;
+    display: block;
+  }
+  
+  th, td {
+    padding: 10px !important;
+  }
+  
+  /* Esconder colunas menos importantes em tablet */
+  th:nth-child(n+4),
+  td:nth-child(n+4) {
+    display: none;
+  }
+}
+
+/* ============================================
+   TABLET PORTRAIT - 481px a 767px
+   ============================================ */
+@media (min-width: 481px) and (max-width: 767px) {
+  body {
+    font-size: 12px;
+  }
+  
+  .container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 8px;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .sidebar {
+    position: fixed !important;
+    left: -100%;
+    top: 0;
+    width: 70%;
+    height: 100vh;
+    z-index: 999;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  }
+  
+  .sidebar.active {
+    left: 0;
+  }
+  
+  .main-content {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  
+  .toggle-sidebar-btn {
+    display: block !important;
+  }
+  
+  /* Tabelas em mobile */
+  table {
+    font-size: 10px;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  thead {
+    display: none;
+  }
+  
+  tbody, tr, td {
+    display: block;
+    width: 100%;
+  }
+  
+  tr {
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px;
+  }
+  
+  td {
+    padding: 6px 0 !important;
+    text-align: right;
+    padding-right: 50% !important;
+    position: relative;
+  }
+  
+  td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 6px;
+    font-weight: bold;
+    text-align: left;
+  }
+}
+
+/* ============================================
+   MOBILE - até 480px
+   ============================================ */
+@media (max-width: 480px) {
+  * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  body {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  
+  .container {
+    max-width: 100%;
+    margin: 0;
+    padding: 4px;
+    width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .sidebar {
+    position: fixed !important;
+    left: -100%;
+    top: 0;
+    width: 85%;
+    height: 100vh;
+    z-index: 999;
+    transition: left 0.3s ease;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.15);
+    overflow-y: auto;
+  }
+  
+  .sidebar.active {
+    left: 0;
+  }
+  
+  .sidebar-backdrop {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+  }
+  
+  .main-content {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  
+  .toggle-sidebar-btn {
+    display: block !important;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin-right: 8px;
+  }
+  
+  /* Botões */
+  button, input[type="button"], input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 12px;
+    padding: 8px 12px !important;
+  }
+  
+  /* Inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    width: 100% !important;
+    font-size: 12px;
+    padding: 10px 8px !important;
+  }
+  
+  /* Tabelas em mobile */
+  table {
+    font-size: 10px;
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  thead {
+    display: none;
+  }
+  
+  tbody, tr, td {
+    display: block;
+    width: 100%;
+  }
+  
+  tr {
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px;
+  }
+  
+  td {
+    padding: 4px 0 !important;
+    text-align: right;
+    padding-right: 50% !important;
+    position: relative;
+    min-height: 24px;
+  }
+  
+  td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 6px;
+    font-weight: bold;
+    text-align: left;
+    width: 45%;
+  }
+  
+  /* Cards */
+  .card {
+    margin-bottom: 8px !important;
+    padding: 10px !important;
+  }
+  
+  /* Modal/Dialog */
+  .modal, .dialog {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 0 auto !important;
+  }
+  
+  /* Flex containers - se quebram em mobile viram stack */
+  .flex-row {
+    display: flex !important;
+    flex-direction: column;
+  }
+  
+  .flex-row > * {
+    width: 100% !important;
+    margin-bottom: 8px;
+  }
+}
+
+/* ============================================
+   EXTREMELY SMALL - menos de 360px
+   ============================================ */
+@media (max-width: 359px) {
+  body {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  
+  .container {
+    padding: 2px;
+  }
+  
+  button, input[type="button"], input[type="submit"] {
+    min-height: 40px;
+    padding: 6px 8px !important;
+    font-size: 10px;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 10px;
+    padding: 8px 6px !important;
+  }
+  
+  .sidebar {
+    width: 90% !important;
+  }
+}
+
+/* ============================================
+   ORIENTAÇÃO - Landscape vs Portrait
+   ============================================ */
+@media (orientation: landscape) and (max-height: 600px) {
+  .sidebar {
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .header, .footer {
+    min-height: 40px;
+  }
+}
+
+/* ============================================
+   UTILITÁRIOS RESPONSIVOS
+   ============================================ */
+
+/* Esconder elementos em resoluções específicas */
+.hide-on-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hide-on-mobile {
+    display: block;
+  }
+  
+  .show-on-mobile {
+    display: none;
+  }
+}
+
+/* Flexbox responsivo */
+.flex-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.flex-responsive > * {
+  flex: 1;
+  min-width: 200px;
+}
+
+@media (max-width: 767px) {
+  .flex-responsive > * {
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
+/* Text responsivo */
+.text-responsive-sm { font-size: clamp(10px, 2vw, 12px); }
+.text-responsive-md { font-size: clamp(12px, 2.5vw, 14px); }
+.text-responsive-lg { font-size: clamp(14px, 3vw, 16px); }
+.text-responsive-xl { font-size: clamp(16px, 4vw, 20px); }
+.text-responsive-2xl { font-size: clamp(20px, 5vw, 24px); }
+
+/* Padding responsivo */
+.padding-responsive {
+  padding: clamp(8px, 2vw, 24px);
+}
+
+.margin-responsive {
+  margin: clamp(8px, 2vw, 24px);
+}
+
+/* ============================================
+   SCROLLBAR RESPONSIVO
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ============================================
+   ANIMAÇÕES RESPONSIVAS
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

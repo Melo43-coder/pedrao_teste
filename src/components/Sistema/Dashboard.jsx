@@ -12,6 +12,8 @@ import Home from "./Home";
 import UserProfile from "./UserProfile"; // Novo componente para perfil do usuário
 import UsersEdit from "./UsersEdit"; // Área de edição/cadastro/exclusão de usuários (admin/gerente)
 import "../styles/Dashboard.css";
+import "../../styles/responsive.css";
+import "../../styles/sistema.css";
 
 // small helper to format normalized CNPJ (only digits)
 function formatCnpjDigits(value) {

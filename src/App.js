@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import './styles/responsive.css'; // Importar CSS responsivo
 
 // Landing Page Components
 import Header from "./components/Landing/Header";

@@ -1,0 +1,708 @@
+/* ============================================
+   RESPONSIVE STYLES - SISTEMA
+   ============================================ */
+
+/* SistemaLayout Responsivo */
+.sistema-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sistema-sidebar {
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.sistema-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+}
+
+.sistema-main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Desktop - 1024px e acima */
+@media (min-width: 1024px) {
+  .sistema-layout {
+    flex-direction: row;
+  }
+  
+  .sistema-sidebar {
+    width: 280px;
+    border-right: 1px solid #e5e7eb;
+  }
+  
+  .sistema-content {
+    width: calc(100% - 280px);
+  }
+  
+  .toggle-sidebar-btn {
+    display: none !important;
+  }
+}
+
+/* Tablet - 768px a 1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sistema-layout {
+    flex-direction: row;
+  }
+  
+  .sistema-sidebar {
+    width: 200px;
+    border-right: 1px solid #e5e7eb;
+  }
+  
+  .sistema-content {
+    width: calc(100% - 200px);
+  }
+  
+  .toggle-sidebar-btn {
+    display: flex !important;
+    margin-right: 12px;
+  }
+}
+
+/* Mobile - até 767px */
+@media (max-width: 767px) {
+  .sistema-layout {
+    flex-direction: column;
+  }
+  
+  .sistema-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 85vw;
+    height: 100vh;
+    z-index: 999;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .sistema-sidebar.active {
+    transform: translateX(0);
+  }
+  
+  .sistema-sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+    display: none;
+  }
+  
+  .sistema-sidebar-backdrop.active {
+    display: block;
+  }
+  
+  .sistema-content {
+    width: 100%;
+    height: 100vh;
+  }
+  
+  .sistema-main {
+    padding-bottom: 60px; /* Espaço para botão flutuante */
+  }
+  
+  .toggle-sidebar-btn {
+    display: flex !important;
+    width: 40px;
+    height: 40px;
+    padding: 0 !important;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+  }
+}
+
+/* ============================================
+   CHAT RESPONSIVO
+   ============================================ */
+
+.chat-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 0;
+}
+
+.chat-list {
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid #e5e7eb;
+  background: white;
+}
+
+.chat-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.chat-messages-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-input-area {
+  flex: 0 0 auto;
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .chat-container {
+    gap: 0;
+  }
+  
+  .chat-list {
+    flex: 0 0 280px;
+    width: 280px;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .chat-messages-list {
+    padding: 16px;
+  }
+  
+  .chat-input-area {
+    padding: 16px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .chat-container {
+    gap: 0;
+  }
+  
+  .chat-list {
+    flex: 0 0 200px;
+    width: 200px;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .chat-messages-list {
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .chat-input-area {
+    padding: 12px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .chat-container {
+    flex-direction: column;
+  }
+  
+  .chat-list {
+    flex: 0 0 auto;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 30vh;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .chat-messages-list {
+    padding: 8px 4px;
+    gap: 6px;
+  }
+  
+  .chat-input-area {
+    padding: 8px;
+  }
+  
+  .chat-item {
+    padding: 8px !important;
+    font-size: 11px;
+  }
+}
+
+/* ============================================
+   MENSAGENS CHAT RESPONSIVAS
+   ============================================ */
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  animation: slideIn 0.3s ease;
+}
+
+.chat-message.enviada {
+  align-self: flex-end;
+  max-width: 85%;
+}
+
+.chat-message.recebida {
+  align-self: flex-start;
+  max-width: 85%;
+}
+
+.chat-message-content {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.chat-message-time {
+  font-size: 11px;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .chat-message {
+    max-width: 70%;
+  }
+  
+  .chat-message-content {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .chat-message {
+    max-width: 75%;
+  }
+  
+  .chat-message-content {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .chat-message {
+    max-width: 90%;
+  }
+  
+  .chat-message-content {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  
+  .chat-message-time {
+    font-size: 10px;
+  }
+}
+
+/* ============================================
+   TABLES RESPONSIVAS
+   ============================================ */
+
+.responsive-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.responsive-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.responsive-table th {
+  text-align: left;
+  padding: 12px;
+  background: #f3f4f6;
+  border-bottom: 2px solid #d1d5db;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.responsive-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
+.responsive-table tr:hover {
+  background: #f9fafb;
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .responsive-table {
+    overflow-x: visible;
+  }
+  
+  .responsive-table th,
+  .responsive-table td {
+    padding: 14px;
+    font-size: 14px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .responsive-table {
+    overflow-x: auto;
+  }
+  
+  .responsive-table th,
+  .responsive-table td {
+    padding: 10px;
+    font-size: 12px;
+  }
+}
+
+/* Mobile - Transforma tabela em cards */
+@media (max-width: 767px) {
+  .responsive-table table {
+    display: block;
+    overflow-x: auto;
+  }
+  
+  .responsive-table thead {
+    display: none;
+  }
+  
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    display: block;
+    width: 100%;
+  }
+  
+  .responsive-table tr {
+    margin-bottom: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px;
+  }
+  
+  .responsive-table td {
+    padding: 4px 0 !important;
+    text-align: right;
+    position: relative;
+    padding-right: 50% !important;
+    min-height: 20px;
+    font-size: 11px;
+  }
+  
+  .responsive-table td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 6px;
+    font-weight: bold;
+    text-align: left;
+    width: 45%;
+  }
+}
+
+/* ============================================
+   FORMS RESPONSIVOS
+   ============================================ */
+
+.form-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 6px;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .form-group {
+    margin-bottom: 16px;
+  }
+  
+  .form-row {
+    gap: 16px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .form-group {
+    margin-bottom: 12px;
+  }
+  
+  .form-row {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 8px;
+    font-size: 12px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .form-group {
+    margin-bottom: 10px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 8px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* ============================================
+   BUTTONS RESPONSIVOS
+   ============================================ */
+
+button,
+input[type="button"],
+input[type="submit"],
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+button:hover,
+.btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+button:active,
+.btn:active {
+  transform: translateY(0);
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  button,
+  input[type="button"],
+  input[type="submit"],
+  .btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 40px;
+    width: 100%;
+  }
+  
+  .btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .btn-group button {
+    width: 100%;
+  }
+}
+
+/* ============================================
+   CARDS RESPONSIVOS
+   ============================================ */
+
+.card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .card {
+    padding: 18px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .card {
+    padding: 14px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .card {
+    padding: 12px;
+    border-radius: 6px;
+  }
+}
+
+/* ============================================
+   HEADER/NAVBAR RESPONSIVO
+   ============================================ */
+
+.header, .navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.header-title, .navbar-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .header, .navbar {
+    padding: 14px 20px;
+    gap: 16px;
+  }
+  
+  .header-title, .navbar-title {
+    font-size: 20px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .header, .navbar {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  
+  .header-title, .navbar-title {
+    font-size: 16px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .header, .navbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  
+  .header-title, .navbar-title {
+    font-size: 14px;
+    flex: 1;
+  }
+  
+  .header-actions {
+    gap: 6px;
+  }
+}

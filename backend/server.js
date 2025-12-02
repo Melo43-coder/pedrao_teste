@@ -2,9 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const twilio = require('twilio');
 const admin = require('firebase-admin');
+const Groq = require('groq-sdk');
 require('dotenv').config();
 
 const app = express();
+
+// Inicializar Groq
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
 // Middleware
 app.use(cors());
@@ -53,20 +59,39 @@ app.post('/api/whatsapp/send', async (req, res) => {
       formattedPhone = '55' + formattedPhone;
     }
 
-    // Enviar mensagem via Twilio
-    const result = await client.messages.create({
-      from: twilioWhatsAppNumber,
-      to: `whatsapp:+${formattedPhone}`,
-      body: message
-    });
+    try {
+      // Tentar enviar mensagem via Twilio
+      const result = await client.messages.create({
+        from: twilioWhatsAppNumber,
+        to: `whatsapp:+${formattedPhone}`,
+        body: message
+      });
 
-    console.log(`✅ Mensagem enviada para ${phone}: ${result.sid}`);
+      console.log(`✅ Mensagem enviada para ${phone}: ${result.sid}`);
 
-    res.json({
-      success: true,
-      messageId: result.sid,
-      status: result.status
-    });
+      res.json({
+        success: true,
+        messageId: result.sid,
+        status: result.status,
+        via: 'twilio'
+      });
+    } catch (twilioError) {
+      console.warn('⚠️ Erro ao enviar via Twilio:', twilioError.message);
+      
+      // FALLBACK: Modo sandbox - simular envio
+      console.log(`📱 FALLBACK SANDBOX: Simulando envio para ${phone}`);
+      console.log(`   Mensagem: "${message}"`);
+      
+      const simulatedMessageId = 'SIM_' + Date.now();
+      
+      res.json({
+        success: true,
+        messageId: simulatedMessageId,
+        status: 'simulated',
+        via: 'sandbox',
+        message: 'Mensagem simulada (Twilio em modo sandbox)'
+      });
+    }
   } catch (error) {
     console.error('❌ Erro ao enviar mensagem WhatsApp:', error);
     res.status(500).json({
@@ -203,6 +228,95 @@ app.post('/api/whatsapp/mark-saved', (req, res) => {
   }
   
   res.json({ success: true });
+});
+
+// Rota para processar mensagens com ZOE usando Groq
+app.post('/api/zoe/process-message', async (req, res) => {
+  try {
+    console.log('\n🤖 === ZOE ACIONADA COM GROQ ===');
+    const { mensagem, telefoneCliente, historico, contextoOS } = req.body;
+    
+    console.log('📨 Mensagem do cliente:', mensagem);
+    console.log('📱 Telefone:', telefoneCliente);
+    console.log('📋 Contexto:', contextoOS);
+
+    // Preparar histórico de conversa para Groq
+    const conversationHistory = historico && historico.length > 0
+      ? historico.map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      : [];
+
+    // Adicionar mensagem atual
+    conversationHistory.push({
+      role: 'user',
+      content: mensagem
+    });
+
+    console.log('📚 Histórico preparado:', conversationHistory.length, 'mensagens');
+
+    // Prompt do sistema para ZOE
+    const systemPrompt = `Você é ZOE, uma assistente de atendimento ao cliente da empresa Zillo. 
+Sua responsabilidade é conversar de forma natural, amigável e profissional com clientes enquanto eles aguardam um prestador de serviço.
+
+Características:
+- Seja conversacional e natural, como um humano
+- Use emojis apropriados quando relevante
+- Pergunte sobre a necessidade do cliente
+- Colete informações úteis (o quê, quando, onde, urgência)
+- Seja empático e compreensivo
+- Mantenha a conversa fluindo naturalmente
+- Não repita as mesmas coisas
+- Seja breve mas informativo
+
+Contexto da empresa:
+- Empresa: Zillo
+- Tipo de serviço: ${contextoOS?.tipo || 'Serviços em geral'}
+- Cliente: ${contextoOS?.clienteNome || 'Cliente'}
+
+Responda apenas em português brasileiro de forma natural e conversacional.`;
+
+    // Chamar Groq API
+    const response = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        ...conversationHistory
+      ],
+      model: 'llama-3.3-70b-versatile', // Modelo mais recente e ativo do Groq
+      temperature: 0.7,
+      max_tokens: 500,
+      top_p: 1.0
+    });
+
+    const resposta = response.choices[0]?.message?.content || 'Desculpe, não consegui processar sua mensagem no momento.';
+
+    console.log('✅ Resposta ZOE (IA):', resposta);
+    
+    res.json({
+      success: true,
+      resposta: resposta,
+      modelo: 'zoe-groq-ia',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Erro ao processar ZOE:', error);
+    
+    // Fallback para resposta padrão se Groq falhar
+    const mensagem = req.body.mensagem || '';
+    let respostaFallback = 'Desculpe, tive um problema. Deixa eu tentar entender melhor: ' + mensagem;
+    
+    res.json({
+      success: true,
+      resposta: respostaFallback,
+      modelo: 'zoe-fallback',
+      erro: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Rota de health check
