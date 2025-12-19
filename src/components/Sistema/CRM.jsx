@@ -284,6 +284,11 @@ export default function CRM() {
   const [showNovoClienteModal, setShowNovoClienteModal] = useState(false);
   const [showNovaTarefaModal, setShowNovaTarefaModal] = useState(false);
   const [showNovaMensagemModal, setShowNovaMensagemModal] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showNovoPrestadorModal, setShowNovoPrestadorModal] = useState(false);
+  const [showNovoFuncionarioModal, setShowNovoFuncionarioModal] = useState(false);
+  const [prestadores, setPrestadores] = useState([]);
+  
   const [novaMensagem, setNovaMensagem] = useState({
     destinatario: "",
     assunto: "",
@@ -307,37 +312,131 @@ export default function CRM() {
     endereco: "",
     observacoes: ""
   });
+  const [novoPrestador, setNovoPrestador] = useState({
+    nome: "",
+    email: "",
+    telefone: "",
+    cpf: "",
+    especialidades: [],
+    status: "Disponível"
+  });
+  const [novoFuncionario, setNovoFuncionario] = useState({
+    nome: "",
+    email: "",
+    telefone: "",
+    cpf: "",
+    cargo: "",
+    departamento: "",
+    status: "Ativo"
+  });
+  const [showEditarEspecialidadesModal, setShowEditarEspecialidadesModal] = useState(false);
+  const [itemEditandoEspecialidades, setItemEditandoEspecialidades] = useState(null); // pode ser prestador ou funcionário
+  const [tipoItemEspecialidades, setTipoItemEspecialidades] = useState(null); // 'prestador' ou 'funcionario'
+  const [especialidadaInput, setEspecialidadeInput] = useState("");
   const [conversaAtual, setConversaAtual] = useState(null);
   // Users management (company users)
   const [users, setUsers] = useState([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [newUser, setNewUser] = useState({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '' });
+  const [newUser, setNewUser] = useState({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '', especialidades: [] });
+  const [novaEspecialidadeUser, setNovaEspecialidadeUser] = useState("");
 
   const userRoleLocal = localStorage.getItem('userRole') || 'user';
   const companyCnpjLocal = localStorage.getItem('companyCnpj') || '';
 
   // Carregar dados
+  // Carregar clientes do Firebase
+  const loadClientes = async () => {
+    if (!companyCnpjLocal) return;
+    try {
+      const list = await firebaseService.listCompanyUsers(companyCnpjLocal);
+      // Filtrar para pegar apenas usuários do tipo cliente
+      const clientes = list.filter(u => u.role === 'user' || !u.role).map(u => ({
+        id: u.id || u.username,
+        nome: u.displayName || u.username || 'Cliente',
+        tipo: u.tipoCliente || 'Pessoa Física',
+        segmento: u.segmento || 'Geral',
+        responsavel: u.responsavel || 'Não atribuído',
+        telefone: u.phone || '',
+        email: u.email || '',
+        status: u.active !== false ? 'Ativo' : 'Inativo',
+        valorContrato: u.valorContrato || 0,
+        dataUltimoContato: u.dataUltimoContato || new Date().toISOString().split('T')[0],
+        proximoContato: u.proximoContato || '',
+        endereco: u.address ? `${u.address}, ${u.addressNumber || ''}` : '',
+        observacoes: u.observacoes || '',
+        tags: u.tags || [],
+        historico: u.historico || []
+      }));
+      setClientes(clientes);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      setClientes(MOCK_CLIENTES);
+    }
+  };
+
+  // Carregar prestadores do Firebase
+  const loadPrestadores = async () => {
+    if (!companyCnpjLocal) return;
+    try {
+      // Buscar prestadores do banco
+      const docs = await firebaseService.queryDatabase('prestadores', 'cnpj', companyCnpjLocal);
+      if (docs && docs.length > 0) {
+        setPrestadores(docs);
+      } else {
+        setPrestadores([]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar prestadores:', error);
+      setPrestadores([]);
+    }
+  };
+
+  // Carregar funcionários do Firebase
+  const loadFuncionariosEmpresa = async () => {
+    if (!companyCnpjLocal) return;
+    try {
+      // Buscar funcionários com role 'funcionario' ou 'gerente'
+      const list = await firebaseService.listCompanyUsers(companyCnpjLocal);
+      const funcionarios = list.filter(u => u.role === 'funcionario' || u.role === 'gerente').map(u => ({
+        id: u.id || u.username,
+        nome: u.displayName || u.username || 'Funcionário',
+        email: u.email || '',
+        telefone: u.phone || '',
+        cpf: u.cpf || '',
+        cargo: u.cargo || (u.role === 'gerente' ? 'Gerente' : 'Funcionário'),
+        departamento: u.departamento || 'Administrativo',
+        status: u.active !== false ? 'Ativo' : 'Inativo',
+        especialidades: u.especialidades || []
+      }));
+      setFuncionarios(funcionarios);
+    } catch (error) {
+      console.error('Erro ao carregar funcionários:', error);
+      setFuncionarios(MOCK_FUNCIONARIOS);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Simulando chamada de API
-        setTimeout(() => {
-          setClientes(MOCK_CLIENTES);
-          setFuncionarios(MOCK_FUNCIONARIOS);
-          setMensagens(MOCK_MENSAGENS);
-          setTarefas(MOCK_TAREFAS);
-          setIsLoading(false);
-        }, 800);
+        // Carrega dados do Firebase
+        await Promise.all([
+          loadClientes(),
+          loadPrestadores(),
+          loadFuncionariosEmpresa()
+        ]);
+        setMensagens(MOCK_MENSAGENS);
+        setTarefas(MOCK_TAREFAS);
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
+      } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [companyCnpjLocal]);
 
   // Filtrar clientes
   const filtrarClientes = () => {
@@ -488,13 +587,15 @@ export default function CRM() {
 
   const handleOpenNewUser = () => {
     setEditingUser(null);
-    setNewUser({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '' });
+    setNewUser({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '', especialidades: [] });
+    setNovaEspecialidadeUser("");
     setShowUserModal(true);
   };
 
   const handleEditUser = (u) => {
     setEditingUser(u);
-    setNewUser({ usuario: u.username || '', senha: '', displayName: u.displayName || '', role: u.role || 'user', active: !!u.active, email: u.email || '', phone: u.phone || '', address: u.address || '', addressNumber: u.addressNumber || '' });
+    setNewUser({ usuario: u.username || '', senha: '', displayName: u.displayName || '', role: u.role || 'user', active: !!u.active, email: u.email || '', phone: u.phone || '', address: u.address || '', addressNumber: u.addressNumber || '', especialidades: u.especialidades || [] });
+    setNovaEspecialidadeUser("");
     setShowUserModal(true);
   };
 
@@ -510,7 +611,8 @@ export default function CRM() {
           email: newUser.email || null,
           phone: newUser.phone || null,
           address: newUser.address || null,
-          addressNumber: newUser.addressNumber || null
+          addressNumber: newUser.addressNumber || null,
+          especialidades: newUser.especialidades || []
         };
         await firebaseService.updateUser(companyCnpjLocal, editingUser.id, upd);
         await loadCompanyUsers();
@@ -518,7 +620,7 @@ export default function CRM() {
       } else {
         // create
         if (!newUser.usuario || !newUser.senha) return alert('Usuário e senha são obrigatórios');
-        await firebaseService.registerUser({ cnpj: companyCnpjLocal, usuario: newUser.usuario, senha: newUser.senha, displayName: newUser.displayName, role: newUser.role, active: newUser.active, email: newUser.email, phone: newUser.phone, address: newUser.address, addressNumber: newUser.addressNumber });
+        await firebaseService.registerUser({ cnpj: companyCnpjLocal, usuario: newUser.usuario, senha: newUser.senha, displayName: newUser.displayName, role: newUser.role, active: newUser.active, email: newUser.email, phone: newUser.phone, address: newUser.address, addressNumber: newUser.addressNumber, especialidades: newUser.especialidades || [] });
         await loadCompanyUsers();
         setShowUserModal(false);
       }
@@ -535,6 +637,181 @@ export default function CRM() {
     } catch (err) {
       console.error('Erro ao alternar ativo:', err);
       alert('Erro ao alterar status do usuário.');
+    }
+  };
+
+  // Handlers para Prestadores e Funcionários (Admin)
+  const handleSalvarPrestador = async () => {
+    if (!novoPrestador.nome || !novoPrestador.email) {
+      alert("Nome e email são obrigatórios");
+      return;
+    }
+    const novoPrestadorObj = {
+      id: novoPrestador.id || Date.now().toString(),
+      ...novoPrestador,
+      cnpj: companyCnpjLocal,
+      dataCriacao: novoPrestador.dataCriacao || new Date().toISOString(),
+      dataAtualizacao: new Date().toISOString()
+    };
+    
+    try {
+      // Salvar no Firebase
+      await firebaseService.setData(`prestadores/${novoPrestadorObj.id}`, novoPrestadorObj);
+      
+      if (novoPrestador.id) {
+        setPrestadores(prestadores.map(p => p.id === novoPrestadorObj.id ? novoPrestadorObj : p));
+      } else {
+        setPrestadores([...prestadores, novoPrestadorObj]);
+      }
+      setNovoPrestador({ nome: "", email: "", telefone: "", cpf: "", especialidades: [], status: "Disponível" });
+      setShowNovoPrestadorModal(false);
+      alert("Prestador salvo com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar prestador:", error);
+      alert("Erro ao salvar prestador. Tente novamente.");
+    }
+  };
+
+  const handleSalvarFuncionario = async () => {
+    if (!novoFuncionario.nome || !novoFuncionario.email) {
+      alert("Nome e email são obrigatórios");
+      return;
+    }
+    const novoFuncionarioObj = {
+      id: novoFuncionario.id || Date.now().toString(),
+      ...novoFuncionario,
+      username: novoFuncionario.email.split('@')[0],
+      cnpj: companyCnpjLocal,
+      role: novoFuncionario.cargo === 'Gerente' ? 'gerente' : 'funcionario',
+      active: novoFuncionario.status === 'Ativo',
+      dataCriacao: novoFuncionario.dataCriacao || new Date().toISOString(),
+      dataAtualizacao: new Date().toISOString()
+    };
+    
+    try {
+      // Salvar no Firebase
+      await firebaseService.setData(`users/${novoFuncionarioObj.username}`, novoFuncionarioObj);
+      
+      if (novoFuncionario.id) {
+        setFuncionarios(funcionarios.map(f => f.id === novoFuncionarioObj.id ? novoFuncionarioObj : f));
+      } else {
+        setFuncionarios([...funcionarios, novoFuncionarioObj]);
+      }
+      setNovoFuncionario({ nome: "", email: "", telefone: "", cpf: "", cargo: "", departamento: "", status: "Ativo" });
+      setShowNovoFuncionarioModal(false);
+      alert("Funcionário salvo com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar funcionário:", error);
+      alert("Erro ao salvar funcionário. Tente novamente.");
+    }
+  };
+
+  const handleDeletarPrestador = async (id) => {
+    if (window.confirm("Tem certeza que deseja deletar este prestador?")) {
+      try {
+        // Deletar do Firebase
+        await firebaseService.deleteData(`prestadores/${id}`);
+        setPrestadores(prestadores.filter(p => p.id !== id));
+        alert("Prestador deletado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao deletar prestador:", error);
+        alert("Erro ao deletar prestador. Tente novamente.");
+      }
+    }
+  };
+
+  const handleDeletarFuncionario = async (id) => {
+    if (window.confirm("Tem certeza que deseja deletar este funcionário?")) {
+      try {
+        const func = funcionarios.find(f => f.id === id);
+        if (!func) return;
+        
+        // Deletar do Firebase
+        const username = func.username || func.email.split('@')[0];
+        await firebaseService.deleteData(`users/${username}`);
+        setFuncionarios(funcionarios.filter(f => f.id !== id));
+        alert("Funcionário deletado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao deletar funcionário:", error);
+        alert("Erro ao deletar funcionário. Tente novamente.");
+      }
+    }
+  };
+
+  // Funções para editar especialidades
+  const handleAbrirEditarEspecialidades = (item, tipo) => {
+    setItemEditandoEspecialidades(item);
+    setTipoItemEspecialidades(tipo);
+    setEspecialidadeInput("");
+    setShowEditarEspecialidadesModal(true);
+  };
+
+  const handleAdicionarEspecialidade = () => {
+    if (!especialidadaInput.trim()) return;
+    
+    const novaEspecialidade = especialidadaInput.trim();
+    
+    if (tipoItemEspecialidades === 'prestador') {
+      const especialidadesAtuais = itemEditandoEspecialidades.especialidades || [];
+      if (!especialidadesAtuais.includes(novaEspecialidade)) {
+        const prestadorAtualizado = {
+          ...itemEditandoEspecialidades,
+          especialidades: [...especialidadesAtuais, novaEspecialidade],
+          dataAtualizacao: new Date().toISOString()
+        };
+        setItemEditandoEspecialidades(prestadorAtualizado);
+      }
+    } else if (tipoItemEspecialidades === 'funcionario') {
+      const especialidadesAtuais = itemEditandoEspecialidades.especialidades || [];
+      if (!especialidadesAtuais.includes(novaEspecialidade)) {
+        const funcionarioAtualizado = {
+          ...itemEditandoEspecialidades,
+          especialidades: [...especialidadesAtuais, novaEspecialidade],
+          dataAtualizacao: new Date().toISOString()
+        };
+        setItemEditandoEspecialidades(funcionarioAtualizado);
+      }
+    }
+    
+    setEspecialidadeInput("");
+  };
+
+  const handleRemoverEspecialidade = (especialidade) => {
+    if (tipoItemEspecialidades === 'prestador') {
+      const prestadorAtualizado = {
+        ...itemEditandoEspecialidades,
+        especialidades: itemEditandoEspecialidades.especialidades.filter(e => e !== especialidade),
+        dataAtualizacao: new Date().toISOString()
+      };
+      setItemEditandoEspecialidades(prestadorAtualizado);
+    } else if (tipoItemEspecialidades === 'funcionario') {
+      const funcionarioAtualizado = {
+        ...itemEditandoEspecialidades,
+        especialidades: itemEditandoEspecialidades.especialidades.filter(e => e !== especialidade),
+        dataAtualizacao: new Date().toISOString()
+      };
+      setItemEditandoEspecialidades(funcionarioAtualizado);
+    }
+  };
+
+  const handleSalvarEspecialidades = async () => {
+    try {
+      if (tipoItemEspecialidades === 'prestador') {
+        await firebaseService.setData(`prestadores/${itemEditandoEspecialidades.id}`, itemEditandoEspecialidades);
+        setPrestadores(prestadores.map(p => p.id === itemEditandoEspecialidades.id ? itemEditandoEspecialidades : p));
+      } else if (tipoItemEspecialidades === 'funcionario') {
+        const username = itemEditandoEspecialidades.username || itemEditandoEspecialidades.email.split('@')[0];
+        await firebaseService.setData(`users/${username}`, itemEditandoEspecialidades);
+        setFuncionarios(funcionarios.map(f => f.id === itemEditandoEspecialidades.id ? itemEditandoEspecialidades : f));
+      }
+      
+      setShowEditarEspecialidadesModal(false);
+      setItemEditandoEspecialidades(null);
+      setTipoItemEspecialidades(null);
+      alert("Especialidades salvas com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar especialidades:", error);
+      alert("Erro ao salvar especialidades. Tente novamente.");
     }
   };
 
@@ -711,7 +988,10 @@ export default function CRM() {
       padding: "24px",
       backgroundColor: "#f8fafc",
       minHeight: "100vh",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      "@media (max-width: 640px)": {
+        padding: "12px"
+      }
     },
     header: {
       marginBottom: "24px"
@@ -720,17 +1000,30 @@ export default function CRM() {
       fontSize: "1.875rem",
       fontWeight: "700",
       color: "#0f172a",
-      margin: "0 0 8px 0"
+      margin: "0 0 8px 0",
+      "@media (max-width: 640px)": {
+        fontSize: "1.5rem"
+      }
     },
     pageSubtitle: {
       fontSize: "1rem",
       color: "#64748b",
-      margin: 0
+      margin: 0,
+      "@media (max-width: 640px)": {
+        fontSize: "0.875rem"
+      }
     },
     areaSelector: {
       display: "flex",
       gap: "16px",
-      marginBottom: "24px"
+      marginBottom: "24px",
+      flexWrap: "wrap",
+      "@media (max-width: 768px)": {
+        gap: "12px"
+      },
+      "@media (max-width: 640px)": {
+        gap: "8px"
+      }
     },
     areaButton: {
       padding: "12px 24px",
@@ -739,7 +1032,18 @@ export default function CRM() {
       fontWeight: "600",
       cursor: "pointer",
       border: "none",
-      transition: "all 0.2s ease"
+      transition: "all 0.2s ease",
+      whiteSpace: "nowrap",
+      "@media (max-width: 768px)": {
+        padding: "10px 16px",
+        fontSize: "0.9rem"
+      },
+      "@media (max-width: 640px)": {
+        padding: "8px 12px",
+        fontSize: "0.8rem",
+        flex: "1 1 auto",
+        minWidth: "100px"
+      }
     },
     areaButtonActive: {
       backgroundColor: "#0ea5e9",
@@ -753,7 +1057,14 @@ export default function CRM() {
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: "16px",
-      marginBottom: "24px"
+      marginBottom: "24px",
+      "@media (max-width: 1024px)": {
+        gridTemplateColumns: "repeat(2, 1fr)"
+      },
+      "@media (max-width: 640px)": {
+        gridTemplateColumns: "1fr",
+        gap: "12px"
+      }
     },
     statCard: {
       backgroundColor: "white",
@@ -779,18 +1090,35 @@ export default function CRM() {
     actionBar: {
       display: "flex",
       justifyContent: "space-between",
-      marginBottom: "24px"
+      alignItems: "center",
+      marginBottom: "24px",
+      flexWrap: "wrap",
+      gap: "12px",
+      "@media (max-width: 768px)": {
+        flexDirection: "column",
+        alignItems: "stretch"
+      }
     },
     searchContainer: {
       display: "flex",
-      gap: "12px"
+      gap: "12px",
+      flexWrap: "wrap",
+      "@media (max-width: 640px)": {
+        flexDirection: "column",
+        gap: "8px"
+      }
     },
     searchInput: {
       padding: "10px 16px",
       borderRadius: "8px",
       border: "1px solid #e2e8f0",
       width: "280px",
-      fontSize: "0.875rem"
+      fontSize: "0.875rem",
+      "@media (max-width: 640px)": {
+        width: "100%",
+        padding: "8px 12px",
+        fontSize: "0.8rem"
+      }
     },
     select: {
       padding: "10px 16px",
@@ -801,9 +1129,13 @@ export default function CRM() {
     },
     buttonGroup: {
       display: "flex",
-      gap: "12px"
+      gap: "12px",
+      flexWrap: "wrap",
+      "@media (max-width: 640px)": {
+        gap: "8px"
+      }
     },
-        button: {
+    button: {
       padding: "10px 16px",
       borderRadius: "8px",
       border: "none",
@@ -812,7 +1144,13 @@ export default function CRM() {
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      gap: "8px"
+      gap: "8px",
+      whiteSpace: "nowrap",
+      "@media (max-width: 640px)": {
+        padding: "8px 12px",
+        fontSize: "0.75rem",
+        gap: "4px"
+      }
     },
     primaryButton: {
       backgroundColor: "#0ea5e9",
@@ -843,17 +1181,25 @@ export default function CRM() {
       marginBottom: "24px",
       borderBottom: "1px solid #e2e8f0",
       display: "flex",
-      gap: "24px"
+      gap: "8px",
+      overflowX: "auto",
+      flexWrap: "wrap"
     },
     tab: {
-      padding: "12px 4px",
+      padding: "12px 8px",
       fontSize: "0.875rem",
       fontWeight: "600",
       color: "#64748b",
       cursor: "pointer",
       position: "relative",
       border: "none",
-      backgroundColor: "transparent"
+      backgroundColor: "transparent",
+      whiteSpace: "nowrap",
+      minWidth: "auto",
+      "@media (max-width: 640px)": {
+        fontSize: "0.75rem",
+        padding: "10px 6px"
+      }
     },
     activeTab: {
       color: "#0ea5e9"
@@ -872,7 +1218,10 @@ export default function CRM() {
       gap: "24px"
     },
     contentWithSidebar: {
-      gridTemplateColumns: "2fr 1fr"
+      gridTemplateColumns: "2fr 1fr",
+      "@media (max-width: 1024px)": {
+        gridTemplateColumns: "1fr"
+      }
     },
     mainContent: {
       backgroundColor: "white",
@@ -899,11 +1248,15 @@ export default function CRM() {
     },
     tableContainer: {
       width: "100%",
-      overflowX: "auto"
+      overflowX: "auto",
+      "-webkit-overflow-scrolling": "touch"
     },
     table: {
       width: "100%",
-      borderCollapse: "collapse"
+      borderCollapse: "collapse",
+      "@media (max-width: 768px)": {
+        fontSize: "0.75rem"
+      }
     },
     tableHeader: {
       backgroundColor: "#f8fafc",
@@ -1341,20 +1694,32 @@ export default function CRM() {
       maxWidth: "600px",
       maxHeight: "90vh",
       overflow: "auto",
-      boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+      boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+      "@media (max-width: 640px)": {
+        width: "95%",
+        maxWidth: "100%",
+        maxHeight: "95vh",
+        borderRadius: "8px"
+      }
     },
     modalHeader: {
       padding: "20px",
       borderBottom: "1px solid #e2e8f0",
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "center"
+      alignItems: "center",
+      "@media (max-width: 640px)": {
+        padding: "16px"
+      }
     },
     modalTitle: {
       fontSize: "1.25rem",
       fontWeight: "600",
       color: "#0f172a",
-      margin: 0
+      margin: 0,
+      "@media (max-width: 640px)": {
+        fontSize: "1.1rem"
+      }
     },
     closeButton: {
       backgroundColor: "transparent",
@@ -1370,7 +1735,10 @@ export default function CRM() {
       borderRadius: "6px"
     },
     modalBody: {
-      padding: "20px"
+      padding: "20px",
+      "@media (max-width: 640px)": {
+        padding: "16px"
+      }
     },
     formGroup: {
       marginBottom: "16px"
@@ -1387,7 +1755,11 @@ export default function CRM() {
       padding: "10px 12px",
       borderRadius: "8px",
       border: "1px solid #e2e8f0",
-      fontSize: "0.875rem"
+      fontSize: "0.875rem",
+      "@media (max-width: 640px)": {
+        padding: "8px 10px",
+        fontSize: "0.8rem"
+      }
     },
     modalFooter: {
       padding: "16px 20px",
@@ -1399,7 +1771,38 @@ export default function CRM() {
     formRow: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: "16px"
+      gap: "16px",
+      "@media (max-width: 640px)": {
+        gridTemplateColumns: "1fr",
+        gap: "12px"
+      }
+    },
+    statusBadge: {
+      fontSize: "0.75rem",
+      fontWeight: "600",
+      padding: "4px 12px",
+      borderRadius: "12px",
+      whiteSpace: "nowrap"
+    },
+    statusAtivo: {
+      backgroundColor: "#d1fae5",
+      color: "#065f46"
+    },
+    statusDisponivel: {
+      backgroundColor: "#bfdbfe",
+      color: "#1e40af"
+    },
+    statusInativo: {
+      backgroundColor: "#fee2e2",
+      color: "#991b1b"
+    },
+    warningButton: {
+      backgroundColor: "#fef3c7",
+      color: "#92400e",
+      border: "1px solid #fde68a",
+      "&:hover": {
+        backgroundColor: "#fcd34d"
+      }
     }
   };
 
@@ -1443,21 +1846,52 @@ export default function CRM() {
           Área de Funcionários
         </button>
         {(userRoleLocal === 'admin' || userRoleLocal === 'gerente') && (
-          <button 
-            style={{
-              ...styles.areaButton,
-              ...(activeArea === "usuarios" ? styles.areaButtonActive : styles.areaButtonInactive)
-            }}
-            onClick={() => {
-              setActiveArea("usuarios");
-              setActiveTab("lista");
-              setClienteSelecionado(null);
-              setFuncionarioSelecionado(null);
-              loadCompanyUsers();
-            }}
-          >
-            Área de Usuários (Empresa)
-          </button>
+          <>
+            <button 
+              style={{
+                ...styles.areaButton,
+                ...(activeArea === "usuarios" ? styles.areaButtonActive : styles.areaButtonInactive)
+              }}
+              onClick={() => {
+                setActiveArea("usuarios");
+                setActiveTab("lista");
+                setClienteSelecionado(null);
+                setFuncionarioSelecionado(null);
+                loadCompanyUsers();
+              }}
+            >
+              Área de Usuários (Empresa)
+            </button>
+
+            <button 
+              style={{
+                ...styles.areaButton,
+                backgroundColor: "#10b981",
+                color: "white"
+              }}
+              onClick={() => {
+                window.location.href = '/dashboard/users-edit';
+              }}
+            >
+              ⚙️ Gerenciar Usuários
+            </button>
+
+            {/* Botão Secret o de Admin - Gerenciar Prestadores e Funcionários */}
+            <button 
+              style={{
+                ...styles.areaButton,
+                ...(activeArea === "admin" ? styles.areaButtonActive : styles.areaButtonInactive),
+                position: "relative"
+              }}
+              onClick={() => {
+                setActiveArea("admin");
+                setActiveTab("lista");
+              }}
+              title="⚙️ Painel Administrativo"
+            >
+              👥 Gerenciar Equipe
+            </button>
+          </>
         )}
       </div>
 
@@ -1747,6 +2181,7 @@ export default function CRM() {
                             <option value="admin">admin</option>
                             <option value="gerente">gerente</option>
                             <option value="funcionario">funcionario</option>
+                            <option value="prestador">prestador</option>
                             <option value="user">user</option>
                           </select>
                         </div>
@@ -1758,10 +2193,702 @@ export default function CRM() {
                           </select>
                         </div>
                       </div>
+
+                      {(newUser.role === 'prestador' || newUser.role === 'funcionario') && (
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>✏️ Especialidades</label>
+                          <p style={{fontSize: "0.8rem", color: "#64748b", marginBottom: "8px"}}>Adicione as especialidades deste {newUser.role === 'prestador' ? 'prestador' : 'funcionário'}</p>
+                          
+                          {(newUser.especialidades || []).length > 0 && (
+                            <div style={{display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px"}}>
+                              {newUser.especialidades.map((esp, idx) => (
+                                <div 
+                                  key={idx} 
+                                  style={{
+                                    backgroundColor: "#dbeafe",
+                                    color: "#1e40af",
+                                    padding: "6px 12px",
+                                    borderRadius: "12px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    fontSize: "0.875rem"
+                                  }}
+                                >
+                                  <span>{esp}</span>
+                                  <button 
+                                    style={{
+                                      backgroundColor: "transparent",
+                                      border: "none",
+                                      color: "#1e40af",
+                                      cursor: "pointer",
+                                      fontSize: "1rem",
+                                      padding: "0",
+                                      display: "flex",
+                                      alignItems: "center"
+                                    }}
+                                    onClick={() => setNewUser({
+                                      ...newUser,
+                                      especialidades: (newUser.especialidades || []).filter((e, i) => i !== idx)
+                                    })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{display: "flex", gap: "8px"}}>
+                            <input 
+                              style={{...styles.input, flex: 1}}
+                              value={novaEspecialidadeUser}
+                              onChange={(e) => setNovaEspecialidadeUser(e.target.value)}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && novaEspecialidadeUser.trim()) {
+                                  setNewUser({
+                                    ...newUser,
+                                    especialidades: [...(newUser.especialidades || []), novaEspecialidadeUser.trim()]
+                                  });
+                                  setNovaEspecialidadeUser("");
+                                }
+                              }}
+                              placeholder="Ex: Entrega, Mecânica, Elétrica..."
+                            />
+                            <button 
+                              style={{...styles.button, ...styles.primaryButton}}
+                              onClick={() => {
+                                if (novaEspecialidadeUser.trim()) {
+                                  setNewUser({
+                                    ...newUser,
+                                    especialidades: [...(newUser.especialidades || []), novaEspecialidadeUser.trim()]
+                                  });
+                                  setNovaEspecialidadeUser("");
+                                }
+                              }}
+                            >
+                              ➕ Adicionar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div style={styles.modalFooter}>
                       <button style={{...styles.button, ...styles.outlineButton}} onClick={() => setShowUserModal(false)}>Cancelar</button>
                       <button style={{...styles.button, ...styles.primaryButton}} onClick={handleSaveUser}>{editingUser ? 'Salvar Alterações' : 'Criar Usuário'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PAINEL ADMINISTRATIVO - Gerenciar Prestadores e Funcionários */}
+          {activeArea === "admin" && (userRoleLocal === 'admin' || userRoleLocal === 'gerente') && (
+            <div>
+              {/* Tabs para Clientes, Prestadores e Funcionários */}
+              <div style={styles.tabContainer}>
+                <button 
+                  style={{
+                    ...styles.tab,
+                    ...(activeTab === "clientes" ? styles.activeTab : {})
+                  }}
+                  onClick={() => setActiveTab("clientes")}
+                >
+                  🏢 Clientes da Empresa
+                  {activeTab === "clientes" && <div style={styles.activeTabIndicator}></div>}
+                </button>
+
+                <button 
+                  style={{
+                    ...styles.tab,
+                    ...(activeTab === "prestadores" ? styles.activeTab : {})
+                  }}
+                  onClick={() => setActiveTab("prestadores")}
+                >
+                  👨‍🔧 Prestadores da Empresa
+                  {activeTab === "prestadores" && <div style={styles.activeTabIndicator}></div>}
+                </button>
+                
+                <button 
+                  style={{
+                    ...styles.tab,
+                    ...(activeTab === "funcionarios" ? styles.activeTab : {})
+                  }}
+                  onClick={() => setActiveTab("funcionarios")}
+                >
+                  👥 Funcionários Internos
+                  {activeTab === "funcionarios" && <div style={styles.activeTabIndicator}></div>}
+                </button>
+              </div>
+
+              {/* Seção Clientes */}
+              {activeTab === "clientes" && (
+                <div>
+                  <div style={{...styles.actionBar, marginTop: "20px"}}>
+                    <h3 style={{margin: 0, color: "#0f172a"}}>Gerenciar Clientes</h3>
+                    <button 
+                      style={{...styles.button, ...styles.primaryButton}}
+                      onClick={() => {
+                        setClienteSelecionado(null);
+                        setEditingUser(null);
+                        setNewUser({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '' });
+                        setShowUserModal(true);
+                      }}
+                    >
+                      ➕ Novo Cliente
+                    </button>
+                  </div>
+
+                  {clientes.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <div style={styles.emptyStateIcon}>🏢</div>
+                      <p style={styles.emptyStateText}>Nenhum cliente cadastrado ainda.</p>
+                      <button 
+                        style={{...styles.button, ...styles.primaryButton}}
+                        onClick={() => {
+                          setClienteSelecionado(null);
+                          setEditingUser(null);
+                          setNewUser({ usuario: '', senha: '', displayName: '', role: 'user', active: true, email: '', phone: '', address: '', addressNumber: '' });
+                          setShowUserModal(true);
+                        }}
+                      >
+                        Cadastrar Primeiro Cliente
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px", marginTop: "20px"}}>
+                      {clientes.map(cliente => (
+                        <motion.div 
+                          key={cliente.id}
+                          style={{
+                            backgroundColor: "white",
+                            borderRadius: "12px",
+                            padding: "20px",
+                            border: "1px solid #e2e8f0",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                          }}
+                          whileHover={{y: -5, boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)"}}
+                        >
+                          <div style={{display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "12px"}}>
+                            <h4 style={{margin: 0, color: "#0f172a", fontSize: "1.1rem"}}>{cliente.nome}</h4>
+                            <span style={{...styles.statusBadge, ...styles.statusAtivo}}>{cliente.status}</span>
+                          </div>
+                          
+                          <div style={{fontSize: "0.875rem", color: "#64748b", marginBottom: "12px"}}>
+                            <p style={{margin: "4px 0"}}>📧 {cliente.email}</p>
+                            <p style={{margin: "4px 0"}}>📱 {cliente.telefone || "N/A"}</p>
+                            <p style={{margin: "4px 0"}}>🏷️ {cliente.tipo || "Pessoa Física"}</p>
+                            <p style={{margin: "4px 0"}}>💼 {cliente.segmento || "Geral"}</p>
+                          </div>
+
+                          {cliente.tags && cliente.tags.length > 0 && (
+                            <div style={{marginBottom: "12px"}}>
+                              <p style={{margin: "8px 0 4px 0", fontSize: "0.875rem", fontWeight: "600", color: "#334155"}}>Tags:</p>
+                              <div style={{display: "flex", gap: "4px", flexWrap: "wrap"}}>
+                                {cliente.tags.map((tag, idx) => (
+                                  <span key={idx} style={styles.tag}>{tag}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{display: "flex", gap: "8px", paddingTop: "12px", borderTop: "1px solid #e2e8f0"}}>
+                            <button style={{flex: 1, ...styles.button, ...styles.outlineButton}} onClick={() => {
+                              setClienteSelecionado(cliente);
+                              setEditingUser(cliente);
+                              setNewUser({
+                                usuario: cliente.id || '',
+                                senha: '',
+                                displayName: cliente.nome || '',
+                                role: 'user',
+                                active: cliente.status === 'Ativo',
+                                email: cliente.email || '',
+                                phone: cliente.telefone || '',
+                                address: cliente.endereco || '',
+                                addressNumber: ''
+                              });
+                              setShowUserModal(true);
+                            }}>✎ Editar</button>
+                            <button 
+                              style={{flex: 1, ...styles.button, ...styles.warningButton}}
+                              onClick={() => {
+                                if (window.confirm("Tem certeza que deseja deletar este cliente?")) {
+                                  setClientes(clientes.filter(c => c.id !== cliente.id));
+                                  alert("Cliente deletado com sucesso!");
+                                }
+                              }}
+                            >
+                              🗑️ Deletar
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Seção Prestadores */}
+              {activeTab === "prestadores" && (
+                <div>
+                  <div style={{...styles.actionBar, marginTop: "20px"}}>
+                    <h3 style={{margin: 0, color: "#0f172a"}}>Gerenciar Prestadores de Serviço</h3>
+                    <button 
+                      style={{...styles.button, ...styles.primaryButton}}
+                      onClick={() => setShowNovoPrestadorModal(true)}
+                    >
+                      ➕ Novo Prestador
+                    </button>
+                  </div>
+
+                  {prestadores.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <div style={styles.emptyStateIcon}>👨‍🔧</div>
+                      <p style={styles.emptyStateText}>Nenhum prestador cadastrado ainda.</p>
+                      <button 
+                        style={{...styles.button, ...styles.primaryButton}}
+                        onClick={() => setShowNovoPrestadorModal(true)}
+                      >
+                        Cadastrar Primeiro Prestador
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px", marginTop: "20px"}}>
+                      {prestadores.map(prestador => (
+                        <motion.div 
+                          key={prestador.id}
+                          style={{
+                            backgroundColor: "white",
+                            borderRadius: "12px",
+                            padding: "20px",
+                            border: "1px solid #e2e8f0",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                          }}
+                          whileHover={{y: -5, boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)"}}
+                        >
+                          <div style={{display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "12px"}}>
+                            <h4 style={{margin: 0, color: "#0f172a", fontSize: "1.1rem"}}>{prestador.nome}</h4>
+                            <span style={{...styles.statusBadge, ...styles.statusDisponivel}}>{prestador.status}</span>
+                          </div>
+                          
+                          <div style={{fontSize: "0.875rem", color: "#64748b", marginBottom: "12px"}}>
+                            <p style={{margin: "4px 0"}}>📧 {prestador.email}</p>
+                            <p style={{margin: "4px 0"}}>📱 {prestador.telefone || "N/A"}</p>
+                            <p style={{margin: "4px 0"}}>🆔 {prestador.cpf || "N/A"}</p>
+                          </div>
+
+                          {prestador.especialidades && prestador.especialidades.length > 0 && (
+                            <div style={{marginBottom: "12px"}}>
+                              <p style={{margin: "8px 0 4px 0", fontSize: "0.875rem", fontWeight: "600", color: "#334155"}}>Especialidades:</p>
+                              <div style={{display: "flex", gap: "4px", flexWrap: "wrap"}}>
+                                {prestador.especialidades.map((esp, idx) => (
+                                  <span key={idx} style={styles.tag}>{esp}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{display: "flex", gap: "8px", paddingTop: "12px", borderTop: "1px solid #e2e8f0"}}>
+                            <button 
+                              style={{flex: 1, ...styles.button, ...styles.outlineButton}}
+                              onClick={() => handleAbrirEditarEspecialidades(prestador, 'prestador')}
+                            >
+                              ✏️ Especialidades
+                            </button>
+                            <button 
+                              style={{flex: 1, ...styles.button, ...styles.warningButton}}
+                              onClick={() => handleDeletarPrestador(prestador.id)}
+                            >
+                              🗑️ Deletar
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Seção Funcionários */}
+              {activeTab === "funcionarios" && (
+                <div>
+                  <div style={{...styles.actionBar, marginTop: "20px"}}>
+                    <h3 style={{margin: 0, color: "#0f172a"}}>Gerenciar Funcionários Internos</h3>
+                    <button 
+                      style={{...styles.button, ...styles.primaryButton}}
+                      onClick={() => setShowNovoFuncionarioModal(true)}
+                    >
+                      ➕ Novo Funcionário
+                    </button>
+                  </div>
+
+                  {funcionarios.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <div style={styles.emptyStateIcon}>👥</div>
+                      <p style={styles.emptyStateText}>Nenhum funcionário cadastrado ainda.</p>
+                      <button 
+                        style={{...styles.button, ...styles.primaryButton}}
+                        onClick={() => setShowNovoFuncionarioModal(true)}
+                      >
+                        Cadastrar Primeiro Funcionário
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px", marginTop: "20px"}}>
+                      {funcionarios.map(func => (
+                        <motion.div 
+                          key={func.id}
+                          style={{
+                            backgroundColor: "white",
+                            borderRadius: "12px",
+                            padding: "20px",
+                            border: "1px solid #e2e8f0",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                          }}
+                          whileHover={{y: -5, boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)"}}
+                        >
+                          <div style={{display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "12px"}}>
+                            <h4 style={{margin: 0, color: "#0f172a", fontSize: "1.1rem"}}>{func.nome}</h4>
+                            <span style={{...styles.statusBadge, ...styles.statusAtivo}}>{func.status}</span>
+                          </div>
+                          
+                          <div style={{fontSize: "0.875rem", color: "#64748b", marginBottom: "12px"}}>
+                            <p style={{margin: "4px 0"}}>💼 {func.cargo || "N/A"}</p>
+                            <p style={{margin: "4px 0"}}>🏢 {func.departamento || "N/A"}</p>
+                            <p style={{margin: "4px 0"}}>📧 {func.email}</p>
+                            <p style={{margin: "4px 0"}}>📱 {func.telefone || "N/A"}</p>
+                            <p style={{margin: "4px 0"}}>🆔 {func.cpf || "N/A"}</p>
+                          </div>
+
+                          {func.especialidades && func.especialidades.length > 0 && (
+                            <div style={{marginBottom: "12px"}}>
+                              <p style={{margin: "8px 0 4px 0", fontSize: "0.875rem", fontWeight: "600", color: "#334155"}}>Especialidades:</p>
+                              <div style={{display: "flex", gap: "4px", flexWrap: "wrap"}}>
+                                {func.especialidades.map((esp, idx) => (
+                                  <span key={idx} style={styles.tag}>{esp}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{display: "flex", gap: "8px", paddingTop: "12px", borderTop: "1px solid #e2e8f0"}}>
+                            <button 
+                              style={{flex: 1, ...styles.button, ...styles.outlineButton}}
+                              onClick={() => handleAbrirEditarEspecialidades(func, 'funcionario')}
+                            >
+                              ✏️ Especialidades
+                            </button>
+                            <button 
+                              style={{flex: 1, ...styles.button, ...styles.warningButton}}
+                              onClick={() => handleDeletarFuncionario(func.id)}
+                            >
+                              🗑️ Deletar
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Modais para Novo Prestador */}
+              {showNovoPrestadorModal && (
+                <div style={styles.modal}>
+                  <div style={styles.modalContent}>
+                    <div style={styles.modalHeader}>
+                      <h2 style={styles.modalTitle}>➕ Novo Prestador</h2>
+                      <button 
+                        style={styles.closeButton}
+                        onClick={() => setShowNovoPrestadorModal(false)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={styles.modalBody}>
+                      <div style={styles.formGroup}>
+                        <label style={styles.label}>Nome *</label>
+                        <input 
+                          style={styles.input} 
+                          value={novoPrestador.nome}
+                          onChange={(e) => setNovoPrestador({...novoPrestador, nome: e.target.value})}
+                          placeholder="Nome do prestador"
+                        />
+                      </div>
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Email *</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoPrestador.email}
+                            onChange={(e) => setNovoPrestador({...novoPrestador, email: e.target.value})}
+                            placeholder="email@example.com"
+                          />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Telefone</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoPrestador.telefone}
+                            onChange={(e) => setNovoPrestador({...novoPrestador, telefone: e.target.value})}
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                      </div>
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>CPF</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoPrestador.cpf}
+                            onChange={(e) => setNovoPrestador({...novoPrestador, cpf: e.target.value})}
+                            placeholder="000.000.000-00"
+                          />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Status</label>
+                          <select 
+                            style={styles.input}
+                            value={novoPrestador.status}
+                            onChange={(e) => setNovoPrestador({...novoPrestador, status: e.target.value})}
+                          >
+                            <option value="Disponível">Disponível</option>
+                            <option value="Em Serviço">Em Serviço</option>
+                            <option value="Indisponível">Indisponível</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={styles.formGroup}>
+                        <label style={styles.label}>Especialidades (separadas por vírgula)</label>
+                        <input 
+                          style={styles.input} 
+                          value={novoPrestador.especialidades.join(", ")}
+                          onChange={(e) => setNovoPrestador({...novoPrestador, especialidades: e.target.value.split(",").map(s => s.trim()).filter(s => s)})}
+                          placeholder="Ex: Elétrica, Encanamento, Pintura"
+                        />
+                      </div>
+                    </div>
+                    <div style={styles.modalFooter}>
+                      <button 
+                        style={{...styles.button, ...styles.outlineButton}}
+                        onClick={() => setShowNovoPrestadorModal(false)}
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        style={{...styles.button, ...styles.primaryButton}}
+                        onClick={handleSalvarPrestador}
+                      >
+                        ✓ Cadastrar Prestador
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modais para Novo Funcionário */}
+              {showNovoFuncionarioModal && (
+                <div style={styles.modal}>
+                  <div style={styles.modalContent}>
+                    <div style={styles.modalHeader}>
+                      <h2 style={styles.modalTitle}>➕ Novo Funcionário</h2>
+                      <button 
+                        style={styles.closeButton}
+                        onClick={() => setShowNovoFuncionarioModal(false)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={styles.modalBody}>
+                      <div style={styles.formGroup}>
+                        <label style={styles.label}>Nome *</label>
+                        <input 
+                          style={styles.input} 
+                          value={novoFuncionario.nome}
+                          onChange={(e) => setNovoFuncionario({...novoFuncionario, nome: e.target.value})}
+                          placeholder="Nome do funcionário"
+                        />
+                      </div>
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Email *</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoFuncionario.email}
+                            onChange={(e) => setNovoFuncionario({...novoFuncionario, email: e.target.value})}
+                            placeholder="email@example.com"
+                          />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Telefone</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoFuncionario.telefone}
+                            onChange={(e) => setNovoFuncionario({...novoFuncionario, telefone: e.target.value})}
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                      </div>
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>CPF</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoFuncionario.cpf}
+                            onChange={(e) => setNovoFuncionario({...novoFuncionario, cpf: e.target.value})}
+                            placeholder="000.000.000-00"
+                          />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Cargo *</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoFuncionario.cargo}
+                            onChange={(e) => setNovoFuncionario({...novoFuncionario, cargo: e.target.value})}
+                            placeholder="Ex: Gerente, Supervisor"
+                          />
+                        </div>
+                      </div>
+                      <div style={styles.formRow}>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Departamento</label>
+                          <input 
+                            style={styles.input} 
+                            value={novoFuncionario.departamento}
+                            onChange={(e) => setNovoFuncionario({...novoFuncionario, departamento: e.target.value})}
+                            placeholder="Ex: Administrativo, Suporte"
+                          />
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label}>Status</label>
+                          <select 
+                            style={styles.input}
+                            value={novoFuncionario.status}
+                            onChange={(e) => setNovoFuncionario({...novoFuncionario, status: e.target.value})}
+                          >
+                            <option value="Ativo">Ativo</option>
+                            <option value="Licença">Licença</option>
+                            <option value="Inativo">Inativo</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.modalFooter}>
+                      <button 
+                        style={{...styles.button, ...styles.outlineButton}}
+                        onClick={() => setShowNovoFuncionarioModal(false)}
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        style={{...styles.button, ...styles.primaryButton}}
+                        onClick={handleSalvarFuncionario}
+                      >
+                        ✓ Cadastrar Funcionário
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal para editar especialidades */}
+              {showEditarEspecialidadesModal && itemEditandoEspecialidades && (
+                <div style={styles.modal}>
+                  <div style={styles.modalContent}>
+                    <div style={styles.modalHeader}>
+                      <h2 style={styles.modalTitle}>✏️ Editar Especialidades</h2>
+                      <button 
+                        style={styles.closeButton}
+                        onClick={() => {
+                          setShowEditarEspecialidadesModal(false);
+                          setItemEditandoEspecialidades(null);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={styles.modalBody}>
+                      <h3 style={{color: "#0f172a", marginTop: 0}}>{itemEditandoEspecialidades.nome}</h3>
+                      
+                      <div style={styles.formGroup}>
+                        <label style={styles.label}>Especialidades Atuais:</label>
+                        <div style={{display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px"}}>
+                          {(itemEditandoEspecialidades.especialidades || []).length > 0 ? (
+                            itemEditandoEspecialidades.especialidades.map((esp, idx) => (
+                              <div 
+                                key={idx} 
+                                style={{
+                                  backgroundColor: "#dbeafe",
+                                  color: "#1e40af",
+                                  padding: "6px 12px",
+                                  borderRadius: "12px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px"
+                                }}
+                              >
+                                <span>{esp}</span>
+                                <button 
+                                  style={{
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    color: "#1e40af",
+                                    cursor: "pointer",
+                                    fontSize: "1.2rem",
+                                    padding: "0"
+                                  }}
+                                  onClick={() => handleRemoverEspecialidade(esp)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <p style={{color: "#94a3b8", fontStyle: "italic"}}>Nenhuma especialidade adicionada</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={styles.formGroup}>
+                        <label style={styles.label}>Adicionar Especialidade:</label>
+                        <div style={{display: "flex", gap: "8px"}}>
+                          <input 
+                            style={{...styles.input, flex: 1}}
+                            value={especialidadaInput}
+                            onChange={(e) => setEspecialidadeInput(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAdicionarEspecialidade();
+                              }
+                            }}
+                            placeholder="Digite uma especialidade e pressione Enter"
+                          />
+                          <button 
+                            style={{...styles.button, ...styles.primaryButton}}
+                            onClick={handleAdicionarEspecialidade}
+                          >
+                            ➕ Adicionar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.modalFooter}>
+                      <button 
+                        style={{...styles.button, ...styles.outlineButton}}
+                        onClick={() => {
+                          setShowEditarEspecialidadesModal(false);
+                          setItemEditandoEspecialidades(null);
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        style={{...styles.button, ...styles.primaryButton}}
+                        onClick={handleSalvarEspecialidades}
+                      >
+                        ✓ Salvar Especialidades
+                      </button>
                     </div>
                   </div>
                 </div>

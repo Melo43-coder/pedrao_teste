@@ -706,3 +706,828 @@ button:active,
     gap: 6px;
   }
 }
+
+/* ============================================
+   CONFIGURAÇÕES - CHECKLISTS E SEGURADORAS
+   ============================================ */
+
+.configuracoes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.config-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.config-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.config-content {
+  padding: 20px;
+}
+
+/* ============================================
+   CHECKLISTS
+   ============================================ */
+
+.checklists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.checklist-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.checklist-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-color: #667eea;
+}
+
+.checklist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.checklist-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+  flex: 1;
+}
+
+.checklist-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #dbeafe;
+  color: #0284c7;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.checklist-description {
+  color: #64748b;
+  font-size: 13px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.checklist-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.checklist-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.checklist-items-preview {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.checklist-item-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.checklist-item-tag.obrigatorio {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.checklist-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.checklist-action-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checklist-edit-btn {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+.checklist-edit-btn:hover {
+  background: #c7d2fe;
+}
+
+.checklist-delete-btn {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.checklist-delete-btn:hover {
+  background: #fecaca;
+}
+
+/* ============================================
+   MODAL CHECKLIST
+   ============================================ */
+
+.checklist-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.checklist-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+.checklist-modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.checklist-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.checklist-modal-close {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.checklist-modal-close:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.checklist-modal-body {
+  padding: 20px;
+}
+
+.checklist-form-group {
+  margin-bottom: 16px;
+}
+
+.checklist-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.checklist-form-group input,
+.checklist-form-group select,
+.checklist-form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.checklist-form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.checklist-form-group input:focus,
+.checklist-form-group select:focus,
+.checklist-form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.checklist-items-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #e2e8f0;
+}
+
+.checklist-items-section h4 {
+  margin: 0 0 12px 0;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.checklist-item-input {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+
+.checklist-item-input input {
+  flex: 1;
+}
+
+.checklist-item-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.checklist-item-checkbox input {
+  width: auto;
+}
+
+.checklist-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklist-item-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.checklist-item-row input[type="text"] {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.checklist-item-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checklist-item-remove-btn {
+  padding: 4px 8px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.checklist-item-remove-btn:hover {
+  background: #fecaca;
+}
+
+.checklist-upload-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f0f9ff;
+  border: 2px dashed #0284c7;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.checklist-upload-section h5 {
+  margin: 0 0 8px 0;
+  color: #0284c7;
+  font-size: 13px;
+}
+
+.checklist-upload-input {
+  display: none;
+}
+
+.checklist-upload-label {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #0284c7;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.checklist-upload-label:hover {
+  background: #0369a1;
+}
+
+.checklist-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.checklist-modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checklist-modal-btn.primary {
+  background: #667eea;
+  color: white;
+}
+
+.checklist-modal-btn.primary:hover {
+  background: #5568d3;
+}
+
+.checklist-modal-btn.secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.checklist-modal-btn.secondary:hover {
+  background: #cbd5e1;
+}
+
+/* ============================================
+   SEGURADORAS
+   ============================================ */
+
+.seguradoras-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.seguradora-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.seguradora-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-color: #10b981;
+  transform: translateY(-2px);
+}
+
+.seguradora-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.seguradora-logo {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  background: #e0f2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #0284c7;
+  font-size: 20px;
+}
+
+.seguradora-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+}
+
+.seguradora-info {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.seguradora-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.seguradora-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.seguradora-detail-label {
+  font-weight: 600;
+  color: #475569;
+}
+
+.seguradora-detail-value {
+  color: #0f172a;
+  text-align: right;
+  flex: 1;
+  margin-left: 8px;
+}
+
+.seguradora-status {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.seguradora-status.ativa {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.seguradora-status.inativa {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.seguradora-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.seguradora-action-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seguradora-edit-btn {
+  background: #dbeafe;
+  color: #0284c7;
+}
+
+.seguradora-edit-btn:hover {
+  background: #bfdbfe;
+}
+
+.seguradora-delete-btn {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.seguradora-delete-btn:hover {
+  background: #fecaca;
+}
+
+/* ============================================
+   MODAL SEGURADORA
+   ============================================ */
+
+.seguradora-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.seguradora-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+.seguradora-modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.seguradora-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.seguradora-modal-close {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.seguradora-modal-close:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.seguradora-modal-body {
+  padding: 20px;
+}
+
+.seguradora-form-group {
+  margin-bottom: 16px;
+}
+
+.seguradora-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.seguradora-form-group input,
+.seguradora-form-group select,
+.seguradora-form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.seguradora-form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.seguradora-form-group input:focus,
+.seguradora-form-group select:focus,
+.seguradora-form-group textarea:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.seguradora-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.seguradora-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.seguradora-modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seguradora-modal-btn.primary {
+  background: #10b981;
+  color: white;
+}
+
+.seguradora-modal-btn.primary:hover {
+  background: #059669;
+}
+
+.seguradora-modal-btn.secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.seguradora-modal-btn.secondary:hover {
+  background: #cbd5e1;
+}
+
+/* ============================================
+   ADICIONAR BOTÃO FLUTUANTE
+   ============================================ */
+
+.config-add-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+}
+
+.config-add-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.config-add-btn:active {
+  transform: scale(0.95);
+}
+
+/* ============================================
+   RESPONSIVO CONFIGURAÇÕES
+   ============================================ */
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .configuracoes-container {
+    padding: 24px;
+  }
+  
+  .checklists-grid,
+  .seguradoras-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .configuracoes-container {
+    padding: 16px;
+  }
+  
+  .checklists-grid,
+  .seguradoras-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  
+  .config-header h2 {
+    font-size: 18px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .configuracoes-container {
+    padding: 12px;
+    gap: 16px;
+  }
+  
+  .config-section {
+    border-radius: 8px;
+  }
+  
+  .config-header {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .config-header h2 {
+    font-size: 16px;
+  }
+  
+  .config-content {
+    padding: 16px;
+  }
+  
+  .checklists-grid,
+  .seguradoras-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .checklist-modal-content,
+  .seguradora-modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+  
+  .checklist-form-row,
+  .seguradora-form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .config-add-btn {
+    bottom: 80px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+}

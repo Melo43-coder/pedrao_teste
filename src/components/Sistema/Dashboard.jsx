@@ -8,6 +8,7 @@ import Financeiro from "./Financeiro";
 import CRM from "./CRM";
 import Chat from "./Chat";
 import Automacao from "./Automacao";
+import Configuracoes from "./Configuracoes";
 import Home from "./Home";
 import UserProfile from "./UserProfile"; // Novo componente para perfil do usuário
 import UsersEdit from "./UsersEdit"; // Área de edição/cadastro/exclusão de usuários (admin/gerente)
@@ -32,7 +33,8 @@ const menu = [
   { label: "Financeiro", path: "financeiro", icon: "💰", description: "Contas e fluxo de caixa" },
   { label: "CRM", path: "crm", icon: "👥", description: "Gestão de clientes" },
   { label: "Chat", path: "chat", icon: "💬", description: "Comunicação em tempo real" },
-  { label: "Automação", path: "automacao", icon: "🤖", description: "Processos automatizados" }
+  { label: "Automação", path: "automacao", icon: "🤖", description: "Processos automatizados" },
+  { label: "Configurações", path: "configuracoes", icon: "⚙️", description: "Checklists e Seguradoras" }
 ];
 
 // Componente de Breadcrumb para melhorar a navegação
@@ -49,7 +51,7 @@ const Breadcrumb = () => {
   if (activePath === "perfil") {
     return (
       <div className="breadcrumb">
-        <span className="breadcrumb-home">Assistus</span>
+        <span className="breadcrumb-home">SmartOps</span>
         <span className="breadcrumb-separator">/</span>
         <span className="breadcrumb-current">Meu Perfil</span>
       </div>
@@ -60,7 +62,7 @@ const Breadcrumb = () => {
 
   return (
     <div className="breadcrumb">
-      <span className="breadcrumb-home">Assistus</span>
+      <span className="breadcrumb-home">SmartOps</span>
       <span className="breadcrumb-separator">/</span>
       {currentMenu && (
         <span className="breadcrumb-current">
@@ -96,7 +98,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const userName = localStorage.getItem("userName") || "Usuário";
-  const userEmail = localStorage.getItem("userEmail") || "usuario@assistus.com";
+  const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
   const userInitial = userName.charAt(0).toUpperCase();
   const userRole = localStorage.getItem('userRole') || 'user';
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
@@ -120,7 +122,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
       <div className="logo-container">
         <h1 className="logo">
           <span className="logo-icon">S</span>
-          Assistus
+          SmartOps
         </h1>
       </div>
       
@@ -512,6 +514,7 @@ export default function Dashboard() {
             <Route path="/crm" element={<CRM />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/automacao" element={<Automacao />} />
+            <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/users-edit" element={<UsersEdit />} />
             <Route path="/perfil" element={<UserProfile />} />
             {/* Rota de fallback para redirecionamento */}

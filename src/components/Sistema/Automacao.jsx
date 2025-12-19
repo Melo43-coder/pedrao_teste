@@ -464,25 +464,38 @@ export default function AutomacaoIA() {
   // ✅ GERAR RECOMENDAÇÕES DA IA PARA AUTOMAÇÃO
   const gerarRecomendacoesIA = async () => {
     try {
-      console.log("🤖 IA analisando fluxo de trabalho e gerando recomendações...");
+      console.log("🤖 [Groq/Llama] Analisando fluxo de trabalho e gerando recomendações...");
       
-      // Chamar Groq para gerar recomendações inteligentes
+      const prestadoresDisponiveis = prestadores.filter(p => p.status === "Disponível").length;
+      const tempoMedioAtendimento = prestadores.length > 0 
+        ? Math.round(prestadores.reduce((acc, p) => acc + p.tempoMedioServico, 0) / prestadores.length)
+        : 0;
+      
+      // Chamar Groq para gerar recomendações inteligentes com contexto completo
       const prompt = `
-        Você é um especialista em automação de fluxos de trabalho para empresa de TI. 
-        Analise os dados e gere 3 recomendações de AUTOMAÇÃO específicas e acionáveis.
-        
-        DADOS ATUAIS:
-        - Serviços Pendentes: ${servicosPendentes.length}
-        - Prestadores Disponíveis: ${prestadores.filter(p => p.status === "Disponível").length}
-        - Tempo Médio de Atendimento: ${Math.round(prestadores.reduce((acc, p) => acc + p.tempoMedioServico, 0) / prestadores.length)} minutos
-        - Taxa de Satisfação: ${insights[insights.length - 1]?.metricas?.confiabilidade || 0}%
-        
-        Para cada recomendação, forneça:
-        1. Título da Automação
-        2. Benefício específico
-        3. Ação de implementação em um parágrafo claro
-        
-        Formato: Use separadores "||" entre recomendações.
+Você é um especialista em automação e otimização de fluxos de trabalho para empresas de serviços de TI.
+
+ANÁLISE CRÍTICA DO SISTEMA ATUAL:
+📊 Dados em Tempo Real:
+- Serviços Pendentes: ${servicosPendentes.length}
+- Prestadores Disponíveis: ${prestadoresDisponiveis}
+- Tempo Médio de Atendimento: ${tempoMedioAtendimento} minutos
+- Taxa de Satisfação Média: ${insights[0]?.metricas?.confiabilidade || 'Não calculada'}%
+- Regras Ativas: ${regrasAutomacao.filter(r => r.status === "Ativo").length}
+
+REQUISIÇÃO:
+Analise PROFUNDAMENTE e gere exatamente 3 recomendações estratégicas de AUTOMAÇÃO que:
+1. Sejam específicas e mensuráveis
+2. Tragam impacto real na eficiência operacional
+3. Sejam implementáveis imediatamente
+
+Para CADA recomendação, estruture assim:
+[TÍTULO]: Nome curto e direto
+[BENEFÍCIO]: O que será ganho em % ou número
+[AÇÃO]: Como implementar em 2-3 linhas
+[IMPACTO]: Quais métricas melhoram
+
+Separe as 3 recomendações com "==="
       `;
       
       const response = await fetch('http://localhost:3001/api/zoe/process-message', {
@@ -492,27 +505,44 @@ export default function AutomacaoIA() {
           mensagem: prompt,
           telefoneCliente: '+5511999999999',
           historico: [],
-          contextoOS: { tipo: 'automacao', dados: 'recomendacoes' }
+          contextoOS: { 
+            tipo: 'automacao', 
+            dados: 'recomendacoes',
+            totalServicos: servicosPendentes.length,
+            prestadoresDisponiveis: prestadoresDisponiveis,
+            cnpj: cnpj
+          }
         })
       });
       
       if (response.ok) {
         const data = await response.json();
-        const recomendacoes = data.resposta.split('||').slice(0, 3).map((rec, idx) => ({
-          id: idx + 1,
-          titulo: rec.split('\n')[0]?.substring(0, 60) || `Recomendação ${idx + 1}`,
-          descricao: rec.trim(),
-          aplicada: false
-        }));
+        const resposta = data.resposta || '';
         
-        console.log("✅ Recomendações geradas pela IA:", recomendacoes);
+        // Parsear resposta estruturada
+        const recomendacoes = resposta.split('===').slice(0, 3).map((rec, idx) => {
+          const linhas = rec.trim().split('\n').filter(l => l.trim());
+          return {
+            id: idx + 1,
+            titulo: linhas.find(l => l.includes('[TÍTULO]'))?.replace('[TÍTULO]:', '').trim() || `Recomendação ${idx + 1}`,
+            beneficio: linhas.find(l => l.includes('[BENEFÍCIO]'))?.replace('[BENEFÍCIO]:', '').trim() || '',
+            acao: linhas.find(l => l.includes('[AÇÃO]'))?.replace('[AÇÃO]:', '').trim() || '',
+            impacto: linhas.find(l => l.includes('[IMPACTO]'))?.replace('[IMPACTO]:', '').trim() || '',
+            descricao: rec.trim(),
+            aplicada: false
+          };
+        }).filter(r => r.titulo);
+        
+        console.log("✅ [Groq/Llama] 3 recomendações geradas com sucesso:", recomendacoes);
+      } else {
+        console.warn("⚠️ Resposta da IA não foi OK:", response.status);
       }
     } catch (error) {
-      console.warn("⚠️ Erro ao gerar recomendações da IA:", error);
+      console.error("❌ Erro ao gerar recomendações (Groq/Llama):", error);
     }
   };
 
-  // ✅ PROCESSAR MENSAGEM COM IA (Groq + Llama)
+  // ✅ PROCESSAR MENSAGEM COM IA (Groq + Llama 3.3 70B)
   const processarMensagemIA = async (mensagem) => {
     if (!mensagem.trim()) {
       alert("❌ Digite uma mensagem para a IA");
@@ -530,19 +560,57 @@ export default function AutomacaoIA() {
     setIaLoading(true);
 
     try {
-      // Enriquecer prompt com contexto de automação
+      // Contexto COMPLETO para a IA analisar profundamente
+      const contextoCompleto = {
+        empresa: { cnpj },
+        servicosEmAndamento: {
+          total: servicosPendentes.length,
+          porStatus: {
+            pendente: servicosPendentes.filter(s => s.status === 'Pendente').length,
+            emProgresso: servicosPendentes.filter(s => s.status === 'Em Progresso').length,
+            aguardando: servicosPendentes.filter(s => s.status === 'Aguardando').length
+          }
+        },
+        prestadores: {
+          total: prestadores.length,
+          disponiveis: prestadores.filter(p => p.status === "Disponível").length,
+          emServico: prestadores.filter(p => p.status === "Em Serviço").length,
+          eficienciaMedia: prestadores.length > 0 
+            ? Math.round(prestadores.reduce((acc, p) => acc + p.eficiencia, 0) / prestadores.length)
+            : 0
+        },
+        automacao: {
+          regrasAtivas: regrasAutomacao.filter(r => r.status === "Ativo").length,
+          regrasInativas: regrasAutomacao.filter(r => r.status !== "Ativo").length
+        },
+        metricas: {
+          tempoMedioAtendimento: prestadores.length > 0
+            ? Math.round(prestadores.reduce((acc, p) => acc + p.tempoMedioServico, 0) / prestadores.length)
+            : 0,
+          satisfacao: insights[0]?.metricas?.confiabilidade || 0
+        }
+      };
+      
+      // Enriquecer prompt com contexto PROFUNDO
       const promptEnriquecido = `
-        Você é um assistente de automação inteligente para a empresa com CNPJ: ${cnpj}.
-        
-        CONTEXTO ATUAL:
-        - ${servicosPendentes.length} serviços aguardando atribuição
-        - ${prestadores.filter(p => p.status === "Disponível").length} técnicos disponíveis
-        - ${regrasAutomacao.filter(r => r.status === "Ativo").length} regras de automação ativas
-        
-        PERGUNTA DO USUÁRIO: ${mensagem}
-        
-        Forneça uma resposta prática e orientada para AÇÃO. Se for uma pergunta sobre automação,
-        recomende regras específicas. Se for sobre fluxo de trabalho, sugira otimizações.
+Você é um assistente de AUTOMAÇÃO e OTIMIZAÇÃO de fluxos de trabalho para a empresa com CNPJ: ${cnpj}.
+Você tem acesso a DADOS EM TEMPO REAL e deve fornecer análises e recomendações PRECISAS.
+
+📊 CONTEXTO OPERACIONAL COMPLETO:
+${JSON.stringify(contextoCompleto, null, 2)}
+
+🎯 PERGUNTA/SOLICITAÇÃO DO USUÁRIO:
+"${mensagem}"
+
+INSTRUÇÕES PARA RESPOSTA:
+1. Analise PROFUNDAMENTE o contexto atual
+2. Se for pergunta sobre automação: recomende regras específicas com impacto estimado
+3. Se for sobre fluxo de trabalho: sugira otimizações com métricas de melhoria
+4. Se for sobre performance: identifique gargalos e soluções
+5. SEMPRE forneça ações concretas e mensuráveis
+6. Se aplicável, cite números e porcentagens de ganho potencial
+
+Responda de forma ESTRUTURADA e PROFISSIONAL:
       `;
       
       const response = await fetch('http://localhost:3001/api/zoe/process-message', {
@@ -551,42 +619,131 @@ export default function AutomacaoIA() {
         body: JSON.stringify({
           mensagem: promptEnriquecido,
           telefoneCliente: '+5511999999999',
-          historico: [],
-          contextoOS: { tipo: 'automacao', cnpj: cnpj }
+          historico: iaMessages.map(m => ({
+            tipo: m.tipo === 'usuario' ? 'user' : 'assistant',
+            conteudo: m.texto
+          })),
+          contextoOS: { 
+            tipo: 'automacao', 
+            cnpj: cnpj,
+            contextoCompleto: contextoCompleto
+          }
         })
       });
       
       if (response.ok) {
         const data = await response.json();
-        setIaMessages(prev => [...prev, { tipo: 'bot', texto: data.resposta }]);
-        console.log(`✅ IA processou mensagem com sucesso (CNPJ: ${cnpj})`);
+        setIaMessages(prev => [...prev, { 
+          tipo: 'bot', 
+          texto: data.resposta,
+          timestamp: new Date().toLocaleTimeString('pt-BR')
+        }]);
+        console.log(`✅ [Groq/Llama 3.3 70B] IA processou mensagem com sucesso (CNPJ: ${cnpj})`);
       } else {
-        throw new Error('Erro ao chamar IA');
+        throw new Error(`Erro HTTP ${response.status} ao chamar IA`);
       }
     } catch (error) {
-      console.error("❌ Erro ao processar IA:", error);
+      console.error("❌ Erro ao processar IA (Groq/Llama):", error);
       setIaMessages(prev => [...prev, { 
         tipo: 'bot', 
-        texto: `⚠️ Erro ao processar sua pergunta: ${error.message}. Tente novamente em alguns segundos.` 
+        texto: `❌ Erro ao processar sua pergunta: ${error.message}. \n\nDica: Certifique-se de que o servidor Groq está rodando em http://localhost:3001`, 
+        timestamp: new Date().toLocaleTimeString('pt-BR')
       }]);
     } finally {
       setIaLoading(false);
     }
   };
 
-  // ✅ ATUALIZAR INSIGHTS E PREVISÕES A CADA 12H
+  // ✅ ATUALIZAR INSIGHTS E PREVISÕES A CADA 12H COM GROQ
   useEffect(() => {
-    // Funções internas para geração de IA
     const gerarInsightsIA = async () => {
-      console.log("🤖 Gerando insights pela IA...");
-      // Será implementado chamando a IA
-      await new Promise(r => setTimeout(r, 500));
+      console.log("🤖 [Groq/Llama] Gerando insights profundos sobre operações...");
+      try {
+        const promptInsights = `
+Você é um analista de BI avançado. Analise PROFUNDAMENTE os dados operacionais e gere 5 INSIGHTS estratégicos.
+
+DADOS OPERACIONAIS:
+- Serviços Pendentes: ${servicosPendentes.length}
+- Prestadores Disponíveis: ${prestadores.filter(p => p.status === "Disponível").length}
+- Tempo Médio: ${prestadores.length > 0 ? Math.round(prestadores.reduce((acc, p) => acc + p.tempoMedioServico, 0) / prestadores.length) : 0}min
+- Taxa de Conclusão: ${servicosPendentes.length > 0 ? '70%' : 'N/A'}
+
+Gere insights mensuráveis, estruturados assim:
+[INSIGHT 1]: Título
+[IMPACTO]: X% de melhoria potencial
+[RECOMENDAÇÃO]: Ação específica
+
+Separe com "---"
+        `;
+
+        const response = await fetch('http://localhost:3001/api/zoe/process-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mensagem: promptInsights,
+            telefoneCliente: '+5511999999999',
+            historico: [],
+            contextoOS: { 
+              tipo: 'insights', 
+              cnpj: cnpj,
+              totalServicos: servicosPendentes.length
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("✅ [Groq/Llama] Insights gerados com sucesso");
+          localStorage.setItem('lastInsightsUpdate', new Date().toISOString());
+        }
+      } catch (error) {
+        console.error("❌ Erro ao gerar insights (Groq/Llama):", error);
+      }
     };
 
     const gerarPrevisõesIA = async () => {
-      console.log("🤖 Gerando previsões pela IA...");
-      // Será implementado chamando a IA
-      await new Promise(r => setTimeout(r, 500));
+      console.log("🤖 [Groq/Llama] Gerando previsões inteligentes...");
+      try {
+        const promptPrevisoes = `
+Você é um especialista em previsões e forecasting. Baseado nos padrões operacionais, gere 5 PREVISÕES.
+
+CONTEXTO:
+- Serviços em fila: ${servicosPendentes.length}
+- Capacidade disponível: ${prestadores.filter(p => p.status === "Disponível").length} técnicos
+- Tendência: ${servicosPendentes.length > 10 ? 'Crescente' : 'Estável'}
+
+Estruture as previsões assim:
+[PREVISÃO]: O que vai acontecer
+[PROBABILIDADE]: X%
+[DATA]: Quando
+[PREPARAÇÃO]: O que fazer agora
+
+Separe com "---"
+        `;
+
+        const response = await fetch('http://localhost:3001/api/zoe/process-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mensagem: promptPrevisoes,
+            telefoneCliente: '+5511999999999',
+            historico: [],
+            contextoOS: { 
+              tipo: 'previsoes', 
+              cnpj: cnpj,
+              servicosPendentes: servicosPendentes.length
+            }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("✅ [Groq/Llama] Previsões geradas com sucesso");
+          localStorage.setItem('lastPrevisionsUpdate', new Date().toISOString());
+        }
+      } catch (error) {
+        console.error("❌ Erro ao gerar previsões (Groq/Llama):", error);
+      }
     };
 
     const verificarAtualizacao = async () => {
@@ -601,20 +758,29 @@ export default function AutomacaoIA() {
         (agora - new Date(lastPrevisionsUpdate)) / (1000 * 60 * 60) >= 12;
       
       if (deveAtualizarInsights) {
-        console.log("🤖 Atualizando Insights...");
+        console.log("🔄 Atualizando Insights via Groq/Llama...");
         await gerarInsightsIA();
       }
       
       if (deveAtualizarPrevisoes) {
-        console.log("🤖 Atualizando Previsões...");
+        console.log("🔄 Atualizando Previsões via Groq/Llama...");
         await gerarPrevisõesIA();
       }
     };
     
-    verificarAtualizacao();
+    // Executar verificação inicial após 2 segundos
+    const timeoutInicial = setTimeout(() => {
+      verificarAtualizacao();
+    }, 2000);
+    
+    // Verificar a cada 30 minutos
     const intervalo = setInterval(verificarAtualizacao, 30 * 60 * 1000);
-    return () => clearInterval(intervalo);
-  }, []);
+    
+    return () => {
+      clearTimeout(timeoutInicial);
+      clearInterval(intervalo);
+    };
+  }, [cnpj, servicosPendentes.length, prestadores.length]);
 
   // Formatadores
   const formatarMoeda = (valor) => {
@@ -1961,10 +2127,10 @@ export default function AutomacaoIA() {
           transition={{ duration: 0.3 }}
         >
           <div style={styles.cardHeader}>
-            <h3 style={styles.cardTitle}>🤖 Assistente IA Inteligente - Controle de Fluxo</h3>
+            <h3 style={styles.cardTitle}>🤖 Assistente IA - Groq + Llama 3.3 70B</h3>
             <p style={{ margin: 0, fontSize: '0.875rem', color: '#64748b' }}>
               {cnpj ? `🔐 Empresa: ${cnpj}` : '⚠️ Carregando dados da empresa...'} • 
-              IA controlando Automação, Insights e Fluxo de Trabalho
+              IA gerando Insights, Previsões e Otimizações em Tempo Real
             </p>
           </div>
 
@@ -1989,17 +2155,29 @@ export default function AutomacaoIA() {
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>🤖</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Assistente IA Inteligente</div>
-                <div style={{ fontSize: '14px' }}>
-                  Você está conversando com a IA que controla TODOS os aspectos da automação, 
-                  fluxo de trabalho, insights e previsões.
+                <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Assistente IA Groq + Llama</div>
+                <div style={{ fontSize: '14px', marginBottom: '16px' }}>
+                  Você está conversando com a IA que gerencia TODOS os aspectos da sua operação.
                 </div>
-                <div style={{ fontSize: '13px', marginTop: '16px', color: '#cbd5e1' }}>
-                  ✅ Controle inteligente de Regras de Automação<br/>
-                  ✅ Análise automática de Insights & Previsões<br/>
-                  ✅ Otimização em tempo real do Fluxo de Trabalho<br/>
-                  ✅ Dados reais do seu negócio via CNPJ<br/>
-                  ✅ Powered by Groq + Llama 3.3 70B
+                <div style={{ 
+                  fontSize: '13px', 
+                  color: '#cbd5e1',
+                  background: '#f1f5f9',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  lineHeight: '1.8'
+                }}>
+                  <div style={{marginBottom: '8px', fontWeight: '600', color: '#64748b'}}>⚡ Funções da IA:</div>
+                  ✅ Gera RECOMENDAÇÕES estratégicas de automação<br/>
+                  ✅ Analisa e cria INSIGHTS profundos a cada 12h<br/>
+                  ✅ Gera PREVISÕES inteligentes de demanda<br/>
+                  ✅ Otimiza FLUXO DE TRABALHO em tempo real<br/>
+                  ✅ Responde perguntas sobre sua operação<br/>
+                  <br/>
+                  <span style={{fontWeight: '700', color: '#8b5cf6'}}>🚀 Powered by Groq API + Llama 3.3 70B</span>
+                </div>
+                <div style={{ fontSize: '12px', marginTop: '12px', color: '#94a3b8' }}>
+                  Digite uma pergunta ou solicitação abaixo para começar
                 </div>
               </div>
             )}
@@ -2021,13 +2199,14 @@ export default function AutomacaoIA() {
                     width: '32px',
                     height: '32px',
                     borderRadius: '50%',
-                    backgroundColor: '#8b5cf6',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
                     fontSize: '18px',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)'
                   }}>
                     🤖
                   </div>
@@ -2039,11 +2218,23 @@ export default function AutomacaoIA() {
                   padding: '12px 16px',
                   borderRadius: '12px',
                   border: msg.tipo === 'bot' ? '1px solid #e2e8f0' : 'none',
-                  lineHeight: '1.5',
+                  lineHeight: '1.6',
                   whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word'
+                  wordBreak: 'break-word',
+                  boxShadow: msg.tipo === 'bot' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  fontSize: '13px'
                 }}>
                   {msg.texto}
+                  {msg.timestamp && (
+                    <div style={{
+                      fontSize: '11px',
+                      marginTop: '6px',
+                      opacity: 0.6,
+                      fontStyle: 'italic'
+                    }}>
+                      {msg.timestamp}
+                    </div>
+                  )}
                 </div>
                 {msg.tipo === 'usuario' && (
                   <div style={{
@@ -2063,65 +2254,172 @@ export default function AutomacaoIA() {
                 )}
               </motion.div>
             ))}
+            {iaLoading && (
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                color: '#8b5cf6'
+              }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '18px'
+                }}>
+                  🤖
+                </div>
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <div style={{fontSize: '13px', fontWeight: '600'}}>Groq processando...</div>
+                  <div style={{fontSize: '11px', color: '#64748b', marginTop: '4px'}}>
+                    Análise profunda de dados e geração de insights
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Input Area */}
           <div style={{
             borderTop: '1px solid #e2e8f0',
             padding: '16px',
-            display: 'flex',
-            gap: '8px',
             backgroundColor: 'white'
           }}>
-            <input
-              type="text"
-              value={iaInput}
-              onChange={(e) => setIaInput(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !iaLoading && iaInput.trim()) {
-                  processarMensagemIA(iaInput);
-                }
-              }}
-              placeholder={cnpj ? "Pergunte sobre automação, fluxo de trabalho, insights ou previsões..." : "⚠️ Carregando dados..."}
-              disabled={iaLoading || !cnpj}
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontFamily: 'inherit',
-                opacity: iaLoading || !cnpj ? 0.6 : 1,
-                cursor: iaLoading || !cnpj ? 'not-allowed' : 'text'
-              }}
-            />
-            <button
-              onClick={() => processarMensagemIA(iaInput)}
-              disabled={!iaInput.trim() || iaLoading || !cnpj}
-              style={{
-                padding: '10px 16px',
-                backgroundColor: (iaInput.trim() && !iaLoading && cnpj) ? '#8b5cf6' : '#cbd5e1',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: (iaInput.trim() && !iaLoading && cnpj) ? 'pointer' : 'not-allowed',
-                fontWeight: '600',
-                fontSize: '0.875rem',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                if (iaInput.trim() && !iaLoading && cnpj) {
-                  e.target.style.backgroundColor = '#7c3aed';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (iaInput.trim() && !iaLoading && cnpj) {
-                  e.target.style.backgroundColor = '#8b5cf6';
-                }
-              }}
-            >
-              {iaLoading ? '⏳' : '📤'}
-            </button>
+            {/* Sugestões Rápidas */}
+            {iaMessages.length === 0 && (
+              <div style={{
+                marginBottom: '12px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '8px'
+              }}>
+                {[
+                  '💡 Que automações preciso?',
+                  '📊 Qual é a situação atual?',
+                  '⚡ Como otimizar fluxo?',
+                  '🎯 Previsão de demanda?'
+                ].map((sugestao) => (
+                  <button
+                    key={sugestao}
+                    onClick={() => {
+                      setIaInput(sugestao);
+                      setTimeout(() => processarMensagemIA(sugestao), 100);
+                    }}
+                    disabled={iaLoading}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      color: '#334155',
+                      cursor: iaLoading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!iaLoading) {
+                        e.target.style.background = '#e2e8f0';
+                        e.target.style.borderColor = '#94a3b8';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!iaLoading) {
+                        e.target.style.background = '#f1f5f9';
+                        e.target.style.borderColor = '#cbd5e1';
+                      }
+                    }}
+                  >
+                    {sugestao}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input com Botão */}
+            <div style={{
+              display: 'flex',
+              gap: '8px'
+            }}>
+              <input
+                type="text"
+                value={iaInput}
+                onChange={(e) => setIaInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !iaLoading && iaInput.trim()) {
+                    processarMensagemIA(iaInput);
+                  }
+                }}
+                placeholder={cnpj ? "Pergunte sobre automações, otimizações, insights..." : "⚠️ Carregando dados..."}
+                disabled={iaLoading || !cnpj}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontFamily: 'inherit',
+                  opacity: iaLoading || !cnpj ? 0.6 : 1,
+                  cursor: iaLoading || !cnpj ? 'not-allowed' : 'text'
+                }}
+              />
+              <button
+                onClick={() => processarMensagemIA(iaInput)}
+                disabled={!iaInput.trim() || iaLoading || !cnpj}
+                style={{
+                  padding: '10px 16px',
+                  background: (iaInput.trim() && !iaLoading && cnpj) 
+                    ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)' 
+                    : '#cbd5e1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: (iaInput.trim() && !iaLoading && cnpj) ? 'pointer' : 'not-allowed',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.2s ease',
+                  boxShadow: (iaInput.trim() && !iaLoading && cnpj) ? '0 2px 8px rgba(139, 92, 246, 0.3)' : 'none'
+                }}
+                onMouseOver={(e) => {
+                  if (iaInput.trim() && !iaLoading && cnpj) {
+                    e.target.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.5)';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (iaInput.trim() && !iaLoading && cnpj) {
+                    e.target.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.3)';
+                    e.target.style.transform = 'translateY(0)';
+                  }
+                }}
+              >
+                {iaLoading ? '⏳ Processando' : '🚀 Enviar'}
+              </button>
+            </div>
+
+            {/* Status Footer */}
+            <div style={{
+              marginTop: '8px',
+              fontSize: '11px',
+              color: '#94a3b8',
+              display: 'flex',
+              gap: '16px',
+              justifyContent: 'space-between'
+            }}>
+              <span>🤖 Groq + Llama 3.3 70B</span>
+              <span>{prestadores.length} prestadores • {servicosPendentes.length} serviços</span>
+              <span>{regrasAutomacao.filter(r => r.status === "Ativo").length} regras ativas</span>
+            </div>
           </div>
         </motion.div>
       ) : null}

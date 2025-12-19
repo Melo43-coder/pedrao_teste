@@ -9,11 +9,12 @@ const items = [
   { rota:"financeiro", nome:"Financeiro" },
   { rota:"crm", nome:"CRM" },
   { rota:"automacao", nome:"Automação" },
+  { rota:"configuracoes", nome:"⚙️ Configurações" },
 ];
 
 export default function Sidebar() {
   return (
-    <nav style={{background:"#e86c00",color:"#fff",height:"100vh",minWidth:"180px",padding:"28px 0", position: "relative"}}>
+    <nav style={{background:"#e86c00",color:"#fff",height:"100vh",minWidth:"180px",padding:"28px 16px", position: "relative"}}>
       {/* NotificationCenter */}
       <div style={{ position: "absolute", top: "20px", right: "15px", zIndex: 100 }}>
         <NotificationCenter />
@@ -21,8 +22,22 @@ export default function Sidebar() {
       
       <ul style={{listStyle:"none",margin:0,padding:0}}>
         {items.map((it,i)=>(
-          <li key={i} style={{marginBottom:"18px"}}>
-            <NavLink to={`/dashboard/${it.rota}`} style={({isActive})=>({color:isActive?"#fff":"#ffe3ca",textDecoration:"none",fontWeight:isActive?"bold":"normal",fontSize:"17px"})}>{it.nome}</NavLink>
+          <li key={i} style={{marginBottom:"18px", paddingLeft: "12px"}}>
+            <NavLink 
+              to={`/dashboard/${it.rota}`} 
+              style={({isActive})=>({
+                color:isActive?"#fff":"#ffe3ca",
+                textDecoration:"none",
+                fontWeight:isActive?"bold":"normal",
+                fontSize:"15px",
+                display: "block",
+                padding: "8px 0",
+                borderLeft: isActive ? "3px solid #fff" : "3px solid transparent",
+                transition: "all 0.2s ease"
+              })}
+            >
+              {it.nome}
+            </NavLink>
           </li>
         ))}
       </ul>

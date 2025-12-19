@@ -87,6 +87,169 @@ function OrderMarker({ marker, theme }) {
   );
 }
 
+// Componente de Marcador para Prestador em Tempo Real
+function PrestadorMarker({ prestador, theme }) {
+  // Ícone customizado para prestador - boneco clean
+  const customIcon = L.divIcon({
+    html: `<div style="
+      position: relative;
+      width: 44px;
+      height: 44px;
+    ">
+      <div style="
+        position: absolute;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.15);
+        animation: pulse-ring 2.5s ease-in-out infinite;
+      "></div>
+      <div style="
+        position: absolute;
+        width: 32px;
+        height: 32px;
+        top: 6px;
+        left: 6px;
+        border-radius: 50%;
+        background: #3b82f6;
+        border: 3px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+      ">
+        👤
+      </div>
+    </div>
+    <style>
+      @keyframes pulse-ring {
+        0%, 100% { transform: scale(0.95); opacity: 0.8; }
+        50% { transform: scale(1.15); opacity: 0.3; }
+      }
+    </style>`,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    className: 'prestador-marker'
+  });
+  
+  // Calcular tempo desde última atualização
+  const getTempoAtualizacao = (timestamp) => {
+    if (!timestamp) return 'Desconhecido';
+    const agora = new Date();
+    const ultima = new Date(timestamp);
+    const diffMs = agora - ultima;
+    const diffMin = Math.floor(diffMs / 60000);
+    
+    if (diffMin < 1) return 'Agora mesmo';
+    if (diffMin === 1) return '1 minuto atrás';
+    if (diffMin < 60) return `${diffMin} minutos atrás`;
+    const diffHoras = Math.floor(diffMin / 60);
+    if (diffHoras === 1) return '1 hora atrás';
+    return `${diffHoras} horas atrás`;
+  };
+
+  return (
+    <Marker position={[prestador.latitude, prestador.longitude]} icon={customIcon}>
+      <Popup>
+        <div style={{ fontSize: '13px', minWidth: '280px' }}>
+          <div style={{ 
+            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
+            color: 'white', 
+            padding: '12px', 
+            borderRadius: '8px', 
+            marginBottom: '12px',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '20px' }}>🚗</span>
+              <div style={{ fontWeight: '700', fontSize: '15px' }}>{prestador.nome}</div>
+            </div>
+            <div style={{ fontSize: '11px', opacity: 0.95, fontWeight: '500' }}>
+              Prestador em Movimento
+            </div>
+          </div>
+          
+          <div style={{ display: 'grid', gap: '10px' }}>
+            <div>
+              <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
+                📱 Prestador
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
+                {prestador.prestadorId || 'ID não informado'}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
+                  🟢 Status
+                </div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: prestador.isOnline ? '#10b981' : '#ef4444' }}>
+                  {prestador.isOnline ? 'Online' : 'Offline'}
+                </div>
+              </div>
+              
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
+                  ✅ Disponível
+                </div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: prestador.isAvailable ? '#10b981' : '#f59e0b' }}>
+                  {prestador.isAvailable ? 'Sim' : 'Ocupado'}
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
+                ⏱️ Última Atualização
+              </div>
+              <div style={{ fontSize: '12px', color: '#10b981', fontWeight: '600' }}>
+                {getTempoAtualizacao(prestador.timestamp)}
+              </div>
+            </div>
+            
+            {prestador.speed >= 0 && (
+              <div>
+                <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
+                  🚀 Velocidade
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#1e293b' }}>
+                  {prestador.speed > 0 ? `${Math.round(prestador.speed)} km/h` : 'Parado'}
+                </div>
+              </div>
+            )}
+            
+            {prestador.accuracy > 0 && (
+              <div>
+                <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
+                  📡 Precisão GPS
+                </div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#1e293b' }}>
+                  {Math.round(prestador.accuracy)} metros
+                </div>
+              </div>
+            )}
+            
+            <div style={{ 
+              marginTop: '8px', 
+              padding: '8px', 
+              background: '#f1f5f9', 
+              borderRadius: '6px',
+              fontSize: '11px',
+              color: '#64748b',
+              textAlign: 'center'
+            }}>
+              🟢 Rastreamento em Tempo Real Ativo
+            </div>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 // Dados simulados para gráficos
 const pieData = [
   { name: "Manutenção", value: 420 },
@@ -124,11 +287,33 @@ const satisfacaoData = [
   { name: "Jun", satisfacao: 98 },
 ];
 
-// Componente do Mapa - Mostra Ordens de Serviço em Tempo Real
+// Componente do Mapa - Mostra Ordens de Serviço e Prestadores em Tempo Real
 const ServiceOrderMap = ({ ordensServico, theme, companyCnpj, setOrdensServico }) => {
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroPrioridade, setFiltroPrioridade] = useState("");
   const [filtroResponsavel, setFiltroResponsavel] = useState("");
+  const [prestadoresLocalizacao, setPrestadoresLocalizacao] = useState([]);
+
+  // 🔄 Carregar localização dos prestadores em tempo real
+  useEffect(() => {
+    if (!companyCnpj) return;
+
+    async function loadPrestadoresLocalizacao() {
+      try {
+        const locations = await firebase.getPrestadoresLocation(companyCnpj);
+        console.log('📍 Localizações de prestadores:', locations.length);
+        setPrestadoresLocalizacao(locations);
+      } catch (err) {
+        console.error('Erro ao carregar localização dos prestadores:', err);
+      }
+    }
+
+    loadPrestadoresLocalizacao();
+    
+    // Atualizar a cada 5 segundos para rastreamento em tempo real
+    const interval = setInterval(loadPrestadoresLocalizacao, 5000);
+    return () => clearInterval(interval);
+  }, [companyCnpj]);
 
   // Filtrar ordens de serviço
   const ordensFiltradas = useMemo(() => {
@@ -321,14 +506,45 @@ const ServiceOrderMap = ({ ordensServico, theme, companyCnpj, setOrdensServico }
           📍 Localizar Ordens ({ordensServico.filter(os => !os.latitude || !os.longitude).length})
         </button>
 
-        <div style={{ marginLeft: 'auto', fontSize: '0.85rem', color: theme.subtext, fontWeight: 600 }}>
-          {markers.length} ordem(ns) no mapa
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* Indicador de Prestadores em Tempo Real */}
+          {prestadoresLocalizacao.length > 0 && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '6px 12px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              borderRadius: '20px',
+              color: 'white',
+              fontSize: '0.8rem',
+              fontWeight: '700',
+              boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+              animation: 'pulse 2s infinite'
+            }}>
+              <span style={{ fontSize: '16px' }}>🚗</span>
+              <span>{prestadoresLocalizacao.length} Prestador{prestadoresLocalizacao.length !== 1 ? 'es' : ''} Online</span>
+            </div>
+          )}
+          
+          {/* Contador de OS no mapa */}
+          <div style={{ 
+            fontSize: '0.85rem', 
+            color: theme.subtext, 
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span>📍</span>
+            <span>{markers.length} OS no mapa</span>
+          </div>
         </div>
       </div>
 
       {/* Mapa com Leaflet */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {markers.length > 0 ? (
+        {(markers.length > 0 || prestadoresLocalizacao.length > 0) ? (
           <MapContainer 
             center={[-23.5505, -46.6333]} 
             zoom={14} 
@@ -340,17 +556,27 @@ const ServiceOrderMap = ({ ordensServico, theme, companyCnpj, setOrdensServico }
               maxZoom={19}
             />
             
+            {/* Marcadores de Ordens de Serviço */}
             {markers.map(m => (
-              <OrderMarker key={m.id} marker={m} theme={theme} />
+              <OrderMarker key={`os-${m.id}`} marker={m} theme={theme} />
             ))}
             
-            <MapController markers={markers} />
+            {/* Marcadores de Prestadores em Tempo Real */}
+            {prestadoresLocalizacao.map((prestador, idx) => (
+              <PrestadorMarker 
+                key={`prestador-${prestador.prestadorId || idx}`} 
+                prestador={prestador} 
+                theme={theme} 
+              />
+            ))}
+            
+            <MapController markers={[...markers, ...prestadoresLocalizacao.map(p => ({ lat: p.latitude, lng: p.longitude }))]} />
           </MapContainer>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: theme.subtext, fontSize: '16px' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '48px', marginBottom: '12px' }}>📍</div>
-              <div>Nenhuma ordem de serviço encontrada com os filtros selecionados</div>
+              <div>Nenhuma ordem de serviço ou prestador encontrado</div>
               <div style={{ fontSize: '12px', marginTop: '8px' }}>Ajuste os filtros ou crie novas ordens</div>
             </div>
           </div>
@@ -463,7 +689,7 @@ export default function Dashboard() {
       }}>
         <div>
           <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "4px" }}>
-            Assistus Pro
+            SmartOps Pro
             <span style={{ 
               backgroundColor: theme.highlight, 
               color: "white", 
@@ -538,7 +764,28 @@ export default function Dashboard() {
       {/* Gráficos e mapa */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 24 }}>
         {/* Mapa de Ordens de Serviço */}
-        <Card title="Ordens de Serviço no Mapa" icon={<FiMap />} gridSpan={8} theme={theme}>
+        <Card 
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span>Ordens de Serviço no Mapa</span>
+              {ordensServico && ordensServico.length > 0 && (
+                <span style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '600', 
+                  padding: '4px 10px', 
+                  borderRadius: '12px', 
+                  background: '#10b98120', 
+                  color: '#10b981' 
+                }}>
+                  {ordensServico.length} OS
+                </span>
+              )}
+            </div>
+          }
+          icon={<FiMap />} 
+          gridSpan={8} 
+          theme={theme}
+        >
           <ServiceOrderMap 
             ordensServico={ordensServico}
             theme={theme}

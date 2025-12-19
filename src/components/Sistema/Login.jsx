@@ -5,7 +5,7 @@ import * as api from '../../services/api';
 import firebaseService from '../../services/firebase';
 import { normalizeCnpj } from '../../utils/cnpj';
 
-const USE_FIREBASE = process.env.REACT_APP_USE_FIREBASE === 'true';
+const USE_FIREBASE = true; // ✨ SEMPRE usar Firebase (não depende de .env)
 
 // Dados fictícios para demonstração (fallback quando backend não estiver disponível)
 const MOCK_USERS = [

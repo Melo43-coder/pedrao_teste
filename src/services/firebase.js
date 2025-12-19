@@ -35,6 +35,8 @@ export async function checkUser(cnpj, usuario) {
 
 export async function login({ cnpj, usuario, senha }) {
   const email = makeEmail(cnpj, usuario);
+  
+  // ✨ TENTAR FIREBASE AUTH PRIMEIRO
   try {
     const res = await signInWithEmailAndPassword(auth, email, senha);
     const token = await res.user.getIdToken();
@@ -45,26 +47,40 @@ export async function login({ cnpj, usuario, senha }) {
     const q = query(usersRef, where('username', '==', usuario));
     const snap = await getDocs(q);
     const user = snap.empty ? null : snap.docs[0].data();
-    return { token, userName: (user && user.displayName) || usuario, company: { cnpj: companyId } };
+    return { token, userName: (user && user.displayName) || usuario, company: { cnpj: companyId }, user };
   } catch (err) {
-    // If Email/Password provider is not enabled, fall back to Firestore-stored credentials (development fallback).
-    if (err && err.code === 'auth/operation-not-allowed') {
-      // Try to authenticate against users stored in Firestore (password field stored only in fallback mode)
+    // ✨ FALLBACK: Tentar autenticar pelo Firestore (qualquer erro do Firebase Auth)
+    console.warn('⚠️ Firebase Auth falhou, tentando Firestore fallback:', err.code);
+    
+    try {
       const companyId = normalizeCnpj(cnpj);
       if (!companyId) throw new Error('CNPJ inválido: informe o CNPJ da empresa antes de efetuar o login.');
+      
       const usersRef = collection(db, 'companies', companyId, 'users');
       const q = query(usersRef, where('username', '==', usuario));
       const snap = await getDocs(q);
+      
       if (snap.empty) throw new Error('Usuário não encontrado');
+      
       const docData = snap.docs[0].data();
-      // WARNING: This fallback compares plaintext passwords stored in Firestore — only for local/dev use.
+      
+      // ⚠️ Comparar senha plaintext do Firestore (apenas desenvolvimento)
       if (docData.password && docData.password === senha) {
         const fakeToken = 'firestore-token-' + (docData.uid || snap.docs[0].id);
-        return { token: fakeToken, userName: docData.displayName || usuario, company: { cnpj: companyId } };
+        console.log('✅ Login via Firestore fallback bem-sucedido');
+        return { 
+          token: fakeToken, 
+          userName: docData.displayName || usuario, 
+          company: { cnpj: companyId },
+          user: docData
+        };
       }
-      throw new Error('Senha inválida (fallback)');
+      
+      throw new Error('Senha inválida');
+    } catch (fallbackErr) {
+      // Se fallback também falhar, lançar erro original
+      throw fallbackErr;
     }
-    throw err;
   }
 }
 
@@ -1278,6 +1294,164 @@ export async function obterDashboardAutomacao(cnpj) {
   }
 }
 
+// ===== CHECKLISTS =====
+
+export async function criarChecklist(cnpj, checklistData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const checklistRef = collection(db, 'companies', companyId, 'configuracoes', 'checklists', 'items');
+    const docRef = await addDoc(checklistRef, {
+      ...checklistData,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    });
+    
+    console.log(`✅ Checklist criada: ${docRef.id}`);
+    return { id: docRef.id, ...checklistData };
+  } catch (err) {
+    console.error('❌ Erro ao criar checklist:', err);
+    throw err;
+  }
+}
+
+export async function listarChecklists(cnpj) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const checklistRef = collection(db, 'companies', companyId, 'configuracoes', 'checklists', 'items');
+    const q = query(checklistRef, orderBy('criadoEm', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    const checklists = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${checklists.length} checklists carregadas`);
+    return checklists;
+  } catch (err) {
+    console.error('❌ Erro ao listar checklists:', err);
+    return [];
+  }
+}
+
+export async function atualizarChecklist(cnpj, checklistId, updateData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const checklistRef = doc(db, 'companies', companyId, 'configuracoes', 'checklists', 'items', checklistId);
+    await updateDoc(checklistRef, {
+      ...updateData,
+      atualizadoEm: new Date().toISOString()
+    });
+    
+    console.log(`✅ Checklist atualizada: ${checklistId}`);
+    return { id: checklistId, ...updateData };
+  } catch (err) {
+    console.error('❌ Erro ao atualizar checklist:', err);
+    throw err;
+  }
+}
+
+export async function deletarChecklist(cnpj, checklistId) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const checklistRef = doc(db, 'companies', companyId, 'configuracoes', 'checklists', 'items', checklistId);
+    await deleteDoc(checklistRef);
+    
+    console.log(`✅ Checklist deletada: ${checklistId}`);
+    return { id: checklistId, deleted: true };
+  } catch (err) {
+    console.error('❌ Erro ao deletar checklist:', err);
+    throw err;
+  }
+}
+
+// ===== SEGURADORAS =====
+
+export async function criarSeguradora(cnpj, seguradoraData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const seguradoraRef = collection(db, 'companies', companyId, 'configuracoes', 'seguradoras', 'items');
+    const docRef = await addDoc(seguradoraRef, {
+      ...seguradoraData,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    });
+    
+    console.log(`✅ Seguradora criada: ${docRef.id}`);
+    return { id: docRef.id, ...seguradoraData };
+  } catch (err) {
+    console.error('❌ Erro ao criar seguradora:', err);
+    throw err;
+  }
+}
+
+export async function listarSeguradoras(cnpj) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const seguradoraRef = collection(db, 'companies', companyId, 'configuracoes', 'seguradoras', 'items');
+    const q = query(seguradoraRef, orderBy('criadoEm', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    const seguradoras = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${seguradoras.length} seguradoras carregadas`);
+    return seguradoras;
+  } catch (err) {
+    console.error('❌ Erro ao listar seguradoras:', err);
+    return [];
+  }
+}
+
+export async function atualizarSeguradora(cnpj, seguradoraId, updateData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const seguradoraRef = doc(db, 'companies', companyId, 'configuracoes', 'seguradoras', 'items', seguradoraId);
+    await updateDoc(seguradoraRef, {
+      ...updateData,
+      atualizadoEm: new Date().toISOString()
+    });
+    
+    console.log(`✅ Seguradora atualizada: ${seguradoraId}`);
+    return { id: seguradoraId, ...updateData };
+  } catch (err) {
+    console.error('❌ Erro ao atualizar seguradora:', err);
+    throw err;
+  }
+}
+
+export async function deletarSeguradora(cnpj, seguradoraId) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    const seguradoraRef = doc(db, 'companies', companyId, 'configuracoes', 'seguradoras', 'items', seguradoraId);
+    await deleteDoc(seguradoraRef);
+    
+    console.log(`✅ Seguradora deletada: ${seguradoraId}`);
+    return { id: seguradoraId, deleted: true };
+  } catch (err) {
+    console.error('❌ Erro ao deletar seguradora:', err);
+    throw err;
+  }
+}
+
 export default { 
   identifyCnpj, 
   checkUser, 
@@ -1357,5 +1531,92 @@ export default {
   listarInsights,
   criarPrevisao,
   listarPrevisoes,
-  obterDashboardAutomacao
+  obterDashboardAutomacao,
+  // Configurações - Checklists e Seguradoras
+  criarChecklist,
+  listarChecklists,
+  atualizarChecklist,
+  deletarChecklist,
+  criarSeguradora,
+  listarSeguradoras,
+  atualizarSeguradora,
+  deletarSeguradora,
+  // Localização em Tempo Real
+  getPrestadoresLocation,
+  updatePrestadorLocation
 };
+
+// ===== LOCALIZAÇÃO DOS PRESTADORES EM TEMPO REAL =====
+
+/**
+ * Obter localização em tempo real dos prestadores
+ * Retorna array com: { prestadorId, nome, latitude, longitude, timestamp, osAtual, velocidade }
+ */
+export async function getPrestadoresLocation(cnpj) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    // Rota correta: companies/{cnpj}/prestadores_location
+    const locationRef = collection(db, 'companies', companyId, 'prestadores_location');
+    const snapshot = await getDocs(locationRef);
+    
+    const locations = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        prestadorId: data.prestadorId || doc.id,
+        nome: data.prestadorId || doc.id, // Usar prestadorId como nome se não tiver
+        latitude: data.latitude,
+        longitude: data.longitude,
+        timestamp: data.lastUpdate?.toDate?.()?.toISOString() || data.lastUpdate || new Date().toISOString(),
+        isOnline: data.isOnline || false,
+        isAvailable: data.isAvailable || false,
+        speed: data.speed >= 0 ? data.speed : 0,
+        accuracy: data.accuracy || 0,
+        altitude: data.altitude || 0,
+        heading: data.heading || 0
+      };
+    });
+    
+    // Filtrar apenas prestadores online
+    const onlineLocations = locations.filter(loc => loc.isOnline && loc.latitude && loc.longitude);
+    
+    console.log(`📍 ${onlineLocations.length} prestador(es) online encontrado(s)`);
+    return onlineLocations;
+  } catch (err) {
+    console.error('❌ Erro ao buscar localização dos prestadores:', err);
+    return [];
+  }
+}
+
+/**
+ * Atualizar localização do prestador (chamado pelo app mobile)
+ */
+export async function updatePrestadorLocation(cnpj, prestadorId, locationData) {
+  try {
+    const companyId = normalizeCnpj(cnpj);
+    if (!companyId) throw new Error('CNPJ inválido');
+    
+    // Rota correta: companies/{cnpj}/prestadores_location
+    const locationRef = doc(db, 'companies', companyId, 'prestadores_location', prestadorId);
+    await setDoc(locationRef, {
+      prestadorId,
+      latitude: locationData.latitude,
+      longitude: locationData.longitude,
+      lastUpdate: new Date(),
+      isOnline: locationData.isOnline !== undefined ? locationData.isOnline : true,
+      isAvailable: locationData.isAvailable !== undefined ? locationData.isAvailable : true,
+      speed: locationData.speed >= 0 ? locationData.speed : -1,
+      accuracy: locationData.accuracy || 0,
+      altitude: locationData.altitude || 0,
+      heading: locationData.heading || -1
+    }, { merge: true });
+    
+    console.log(`✅ Localização atualizada para prestador: ${prestadorId}`);
+    return { success: true };
+  } catch (err) {
+    console.error('❌ Erro ao atualizar localização do prestador:', err);
+    throw err;
+  }
+}

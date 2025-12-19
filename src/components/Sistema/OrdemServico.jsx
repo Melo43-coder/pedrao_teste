@@ -365,18 +365,98 @@ export default function OrdemServico() {
   }
 
   // Função para mudar status
-  function changeStatus(codigo, novoStatus) {
-    setOrdens(prev => 
-      prev.map(os => 
-        os.codigo === codigo 
-          ? { 
-              ...os, 
-              status: novoStatus, 
-              ultimaAtualizacao: new Date().toISOString() 
-            } 
-          : os
-      )
-    );
+  async function changeStatus(codigo, novoStatus) {
+    try {
+      setAtualizando(true);
+      
+      // Buscar a OS no array local
+      const os = ordens.find(o => o.codigo === codigo);
+      if (!os) {
+        alert('❌ Ordem de serviço não encontrada');
+        return;
+      }
+      
+      // Verificar se tem ID do Firebase
+      if (!os.id) {
+        console.warn('⚠️ OS sem ID do Firebase, apenas atualizando localmente');
+        // Atualizar apenas localmente se não tiver ID
+        setOrdens(prev => 
+          prev.map(o => 
+            o.codigo === codigo 
+              ? { 
+                  ...o, 
+                  status: novoStatus, 
+                  ultimaAtualizacao: new Date().toISOString(),
+                  ...(novoStatus === 'Concluída' && {
+                    dataConclusao: new Date().toISOString()
+                  })
+                } 
+              : o
+          )
+        );
+        alert(`✅ Status alterado para "${novoStatus}" (apenas localmente)`);
+        if (novoStatus === 'Concluída' && detalhesOS?.codigo === codigo) {
+          setDetalhesOS(null);
+        }
+        return;
+      }
+      
+      // Atualizar no Firebase
+      const companyCnpj = localStorage.getItem('companyCnpj');
+      if (!companyCnpj) {
+        alert('❌ CNPJ da empresa não encontrado');
+        return;
+      }
+      
+      // Preparar dados de atualização
+      const updateData = {
+        status: novoStatus,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Se concluir, adicionar dados de conclusão
+      if (novoStatus === 'Concluída') {
+        updateData.dataConclusao = new Date().toISOString();
+        updateData.concluidoPor = localStorage.getItem('userName') || 'Sistema';
+      }
+      
+      console.log('🔄 Atualizando OS no Firebase:', { id: os.id, codigo, updateData });
+      
+      // Atualizar OS no Firebase
+      await firebase.updateServiceOrder(companyCnpj, os.id, updateData);
+      
+      console.log('✅ OS atualizada no Firebase com sucesso');
+      
+      // Atualizar estado local
+      setOrdens(prev => 
+        prev.map(o => 
+          o.codigo === codigo 
+            ? { 
+                ...o, 
+                status: novoStatus, 
+                ultimaAtualizacao: new Date().toISOString(),
+                ...(novoStatus === 'Concluída' && {
+                  dataConclusao: new Date().toISOString(),
+                  concluidoPor: updateData.concluidoPor
+                })
+              } 
+            : o
+        )
+      );
+      
+      alert(`✅ Status alterado para "${novoStatus}" com sucesso!`);
+      
+      // Se concluiu, fechar modal de detalhes
+      if (novoStatus === 'Concluída' && detalhesOS?.codigo === codigo) {
+        setDetalhesOS(null);
+      }
+      
+    } catch (err) {
+      console.error('❌ Erro ao mudar status:', err);
+      alert(`❌ Erro ao alterar status: ${err.message || 'Erro desconhecido'}`);
+    } finally {
+      setAtualizando(false);
+    }
   }
 
   // Função para atualizar dados
