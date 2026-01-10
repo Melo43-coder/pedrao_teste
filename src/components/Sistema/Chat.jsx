@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiTrash2 } from 'react-icons/fi';
 import * as firebase from '../../services/firebase';
 import { processarMensagemIAInteligente } from '../../services/ia';
+import { db } from '../../firebase/firebaseConfig';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 export default function Chat() {
   const [activeArea, setActiveArea] = useState('conversas');
@@ -69,6 +71,39 @@ export default function Chat() {
       clearInterval(interval);
     };
   }, [chatSelecionado?.id]); // Só reiniciar se o chat mudar
+
+  // 🔥 TEMPO REAL: Listener para mensagens (conversa entre funcionários)
+  useEffect(() => {
+    if (!chatSelecionado || !companyCnpj || !db) return;
+
+    try {
+      const messagesRef = collection(db, 'companies', companyCnpj.replace(/\D/g, ''), 'chats', chatSelecionado.id, 'messages');
+      const q = query(messagesRef, orderBy('dataEnvio', 'asc'));
+
+      console.log('🔥 Iniciando listener de mensagens em tempo real para:', chatSelecionado.id);
+
+      // Listener em tempo real
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const msgs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log('📨 Mensagens atualizadas em tempo real:', msgs.length);
+        setMensagens(msgs);
+      }, (error) => {
+        console.error('❌ Erro no listener de mensagens:', error);
+      });
+
+      // Cleanup: remover listener quando componente desmontar ou chat mudar
+      return () => {
+        console.log('🔌 Removendo listener de mensagens');
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error('❌ Erro ao configurar listener:', error);
+    }
+  }, [chatSelecionado?.id, companyCnpj]);
 
   // Monitorar mensagens e acionar Zoé
   useEffect(() => {

@@ -17,6 +17,7 @@ import {
   removeFromStock,
   notifyAllUsers
 } from "../../services/firebase";
+import { formatCnpj, normalizeCnpj } from "../../utils/cnpj";
 
 const STATUS_COLORS = {
   "Recebido": { bg: "#e6f7ef", text: "#0d9f6f", icon: "✓" },
@@ -76,7 +77,7 @@ export default function Compras() {
 
   // Carregar CNPJ do localStorage e buscar dados
   useEffect(() => {
-    const cnpj = localStorage.getItem("userCnpj");
+    const cnpj = localStorage.getItem("companyCnpj");
     if (cnpj) {
       setCurrentCnpj(cnpj);
       loadAllData(cnpj);
@@ -117,7 +118,12 @@ export default function Compras() {
 
     try {
       setIsLoading(true);
-      await createSupplier(currentCnpj, novoFornecedor);
+      // Normalizar CNPJ antes de enviar (remover formatação)
+      const fornecedorData = {
+        ...novoFornecedor,
+        cnpj: normalizeCnpj(novoFornecedor.cnpj)
+      };
+      await createSupplier(currentCnpj, fornecedorData);
       setNovoFornecedor({
         nome: "",
         cnpj: "",
@@ -880,10 +886,12 @@ export default function Compras() {
                   type="text"
                   style={styles.input}
                   value={novoFornecedor.cnpj}
-                  onChange={(e) =>
-                    setNovoFornecedor({ ...novoFornecedor, cnpj: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const formatted = formatCnpj(e.target.value);
+                    setNovoFornecedor({ ...novoFornecedor, cnpj: formatted });
+                  }}
                   placeholder="XX.XXX.XXX/0001-XX"
+                  maxLength={18}
                   required
                 />
               </div>

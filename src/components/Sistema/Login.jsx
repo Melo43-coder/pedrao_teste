@@ -228,6 +228,9 @@ export default function Login({ recoveryMode = false }) {
           }
 
           localStorage.setItem("authToken", res.token);
+          // Definir expiração do token (24 horas a partir de agora)
+          const expiry = Date.now() + (24 * 60 * 60 * 1000);
+          localStorage.setItem("tokenExpiry", expiry.toString());
           if (res.userName) localStorage.setItem("userName", res.userName);
           // save a sensible companyCnpj normalized so other parts of the app can read it
           if (res.company && res.company.cnpj) {
@@ -246,25 +249,18 @@ export default function Login({ recoveryMode = false }) {
             localStorage.setItem("userEmail", `${usuario}@${normalizeCnpj(cnpj)}.local`);
           }
 
-          // Attempt to fetch the user profile (role and displayName) so the dashboard shows correct name
-          const profileCall = api.checkUser(normalized, usuario);
-          Promise.resolve(profileCall)
-            .then(profileRes => {
-              const role = (profileRes && profileRes.user && profileRes.user.role) ? profileRes.user.role : 'user';
-              const displayName = (profileRes && profileRes.user && profileRes.user.displayName) ? profileRes.user.displayName : usuario;
-              localStorage.setItem('userRole', role);
-              // Override userName with the correct displayName from profile
-              localStorage.setItem('userName', displayName);
-            })
-            .catch(() => {
-              // If profile fetch fails, fallback to demo account roles
-              const demoRole = usuario === 'admin' ? 'admin' : (usuario === 'gerente' ? 'gerente' : 'user');
-              localStorage.setItem('userRole', demoRole);
-            })
-            .finally(() => {
-              setLoginStage(3);
-              setTimeout(() => navigate("/dashboard"), 800);
-            });
+          // Salvar role do usuário (usar dados do Firebase se disponível)
+          if (res.user && res.user.role) {
+            localStorage.setItem('userRole', res.user.role);
+          } else {
+            // Fallback baseado no username
+            const demoRole = usuario === 'admin' ? 'admin' : (usuario === 'gerente' ? 'gerente' : 'user');
+            localStorage.setItem('userRole', demoRole);
+          }
+
+          // ✅ Redirecionar para o dashboard
+          setLoginStage(3);
+          setTimeout(() => navigate("/dashboard"), 800);
         } else {
           setErro((res && res.message) || "Credenciais inválidas. Tente novamente.");
         }
@@ -288,6 +284,9 @@ export default function Login({ recoveryMode = false }) {
           }
 
           localStorage.setItem("authToken", "token-jwt-ficticio-" + Date.now());
+          // Definir expiração do token (24 horas a partir de agora)
+          const expiry = Date.now() + (24 * 60 * 60 * 1000);
+          localStorage.setItem("tokenExpiry", expiry.toString());
           localStorage.setItem("userName", usuarioEncontrado.nome);
           localStorage.setItem("companyCnpj", normalized);
           localStorage.setItem("userEmail", `${usuario}@${normalized}.local`);

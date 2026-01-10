@@ -80,7 +80,7 @@ export default function SistemaLayout({ children }) {
               marginLeft: isMobile ? '12px' : 0,
             }}
           >
-            Assistus
+            SmartOps
           </h1>
         </div>
 

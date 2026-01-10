@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import './styles/responsive.css'; // Importar CSS responsivo
+import { AuthProvider } from './contexts/AuthContext';
 
 // Landing Page Components
 import Header from "./components/Landing/Header";
@@ -60,12 +61,89 @@ const NotFound = () => (
   </div>
 );
 
-// Verificação simples de autenticação
+// Verificação segura de autenticação com Firebase Auth
 const ProtectedRoute = ({ children }) => {
-  // Verificar se o usuário está autenticado (exemplo simples)
-  const isAuthenticated = localStorage.getItem("authToken") !== null;
+  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Primeiro verificar se há dados no localStorage
+        const token = localStorage.getItem("authToken");
+        const userName = localStorage.getItem("userName");
+        const companyCnpj = localStorage.getItem("companyCnpj");
+        const tokenExpiry = localStorage.getItem("tokenExpiry");
+        
+        // Se não tiver dados básicos, não está autenticado
+        if (!token || !userName || !companyCnpj) {
+          setIsAuthenticated(false);
+          setLoading(false);
+          return;
+        }
+
+        // Verificar se o token expirou
+        if (tokenExpiry) {
+          const expiryTime = parseInt(tokenExpiry);
+          const now = Date.now();
+          
+          if (now >= expiryTime) {
+            // Token expirado - limpar dados
+            const keysToRemove = ['authToken', 'tokenExpiry', 'userName', 'companyCnpj', 'userEmail', 'userRole'];
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            setIsAuthenticated(false);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Se passou por todas as verificações, está autenticado
+        setIsAuthenticated(true);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+        setIsAuthenticated(false);
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#f3f4f6'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '5px solid #e5e7eb',
+            borderTop: '5px solid #0ea5e9',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 15px'
+          }}></div>
+          <p style={{ color: '#6b7280', fontSize: '14px' }}>Carregando...</p>
+        </div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
   
-  // Redirecionar para login se não estiver autenticado
   if (!isAuthenticated) {
     return <Navigate to="/sistema" replace />;
   }
@@ -75,42 +153,44 @@ const ProtectedRoute = ({ children }) => {
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Página principal (Landing Page) */}
-        <Route path="/" element={<LandingLayout />} />
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Página principal (Landing Page) */}
+          <Route path="/" element={<LandingLayout />} />
 
-        {/* Rotas de autenticação */}
-        <Route path="/sistema" element={<Login />} />
-        <Route path="/sistema/recuperar-senha" element={<Login recoveryMode={true} />} />
+          {/* Rotas de autenticação */}
+          <Route path="/sistema" element={<Login />} />
+          <Route path="/sistema/recuperar-senha" element={<Login recoveryMode={true} />} />
 
-        {/* Rotas protegidas do sistema */}
-        <Route 
-          path="/dashboard/*" 
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
+          {/* Rotas protegidas do sistema */}
+          <Route 
+            path="/dashboard/*" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
 
-        {/* Painel CRM (admin) */}
-        <Route
-          path="/crm"
-          element={
-            <ProtectedRoute>
-              <AdminPanel />
-            </ProtectedRoute>
-          }
-        />
+          {/* Painel CRM (admin) */}
+          <Route
+            path="/crm"
+            element={
+              <ProtectedRoute>
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Redirecionamentos */}
-        <Route path="/login" element={<Navigate to="/sistema" replace />} />
-        <Route path="/home" element={<Navigate to="/" replace />} />
-        
-        {/* Rota para página não encontrada */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Router>
+          {/* Redirecionamentos */}
+          <Route path="/login" element={<Navigate to="/sistema" replace />} />
+          <Route path="/home" element={<Navigate to="/" replace />} />
+          
+          {/* Rota para página não encontrada */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }

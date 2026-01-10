@@ -12,6 +12,120 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
+// ========================================
+// RATE LIMITER E CACHE PARA GROQ API
+// ========================================
+const rateLimiter = {
+  tokens: 12000, // Limite de tokens por minuto
+  maxTokens: 12000,
+  lastReset: Date.now(),
+  queue: [],
+  processing: false,
+  cache: new Map(), // Cache de respostas
+  cacheTimeout: 5 * 60 * 1000, // 5 minutos
+
+  // Resetar tokens a cada minuto
+  reset() {
+    const now = Date.now();
+    const elapsed = now - this.lastReset;
+    if (elapsed >= 60000) {
+      this.tokens = this.maxTokens;
+      this.lastReset = now;
+      console.log('🔄 Rate limiter resetado. Tokens disponíveis:', this.tokens);
+    }
+  },
+
+  // Adicionar requisição à fila
+  async request(fn, estimatedTokens = 500, cacheKey = null) {
+    // Verificar cache primeiro
+    if (cacheKey && this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < this.cacheTimeout) {
+        console.log('📦 Usando resposta em cache');
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.queue.push({ fn, estimatedTokens, resolve, reject, cacheKey, retries: 0 });
+      this.processQueue();
+    });
+  },
+
+  // Processar fila de requisições
+  async processQueue() {
+    if (this.processing || this.queue.length === 0) return;
+
+    this.processing = true;
+    this.reset();
+
+    while (this.queue.length > 0) {
+      const item = this.queue[0];
+      
+      // Verificar se há tokens suficientes
+      if (this.tokens < item.estimatedTokens) {
+        const waitTime = 60000 - (Date.now() - this.lastReset);
+        if (waitTime > 0) {
+          console.log(`⏳ Aguardando ${Math.ceil(waitTime/1000)}s para resetar rate limit...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          this.reset();
+        }
+      }
+
+      // Executar requisição com retry
+      try {
+        const result = await this.executeWithRetry(item);
+        
+        // Armazenar em cache se tiver chave
+        if (item.cacheKey) {
+          this.cache.set(item.cacheKey, {
+            data: result,
+            timestamp: Date.now()
+          });
+        }
+        
+        item.resolve(result);
+        this.queue.shift();
+      } catch (error) {
+        item.reject(error);
+        this.queue.shift();
+      }
+    }
+
+    this.processing = false;
+  },
+
+  // Executar com retry e backoff exponencial
+  async executeWithRetry(item, maxRetries = 3) {
+    const { fn, estimatedTokens } = item;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        this.tokens -= estimatedTokens;
+        const result = await fn();
+        console.log(`✅ Requisição bem-sucedida. Tokens restantes: ${this.tokens}`);
+        return result;
+      } catch (error) {
+        if (error.status === 429) {
+          // Rate limit atingido
+          const retryAfter = error.headers?.['retry-after'] || 2;
+          const waitTime = parseFloat(retryAfter) * 1000 + (attempt * 1000); // Backoff exponencial
+          
+          console.log(`⚠️ Rate limit atingido. Tentativa ${attempt + 1}/${maxRetries + 1}. Aguardando ${waitTime/1000}s...`);
+          
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            this.tokens += estimatedTokens; // Devolver tokens para retry
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
+  }
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -257,7 +371,7 @@ app.post('/api/zoe/process-message', async (req, res) => {
     console.log('📚 Histórico preparado:', conversationHistory.length, 'mensagens');
 
     // Prompt do sistema para ZOE
-    const systemPrompt = `Você é ZOE, uma assistente de atendimento ao cliente da empresa Assistus. 
+    const systemPrompt = `Você é ZOE, uma assistente de atendimento ao cliente da empresa Zillo. 
 Sua responsabilidade é conversar de forma natural, amigável e profissional com clientes enquanto eles aguardam um prestador de serviço.
 
 Características:
@@ -271,26 +385,34 @@ Características:
 - Seja breve mas informativo
 
 Contexto da empresa:
-- Empresa: Assistus
+- Empresa: Zillo
 - Tipo de serviço: ${contextoOS?.tipo || 'Serviços em geral'}
 - Cliente: ${contextoOS?.clienteNome || 'Cliente'}
 
 Responda apenas em português brasileiro de forma natural e conversacional.`;
 
-    // Chamar Groq API
-    const response = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        ...conversationHistory
-      ],
-      model: 'llama-3.3-70b-versatile', // Modelo mais recente e ativo do Groq
-      temperature: 0.7,
-      max_tokens: 500,
-      top_p: 1.0
-    });
+    // Chamar Groq API com rate limiting e cache
+    const cacheKey = `zoe_${mensagem.substring(0, 50)}_${JSON.stringify(contextoOS || {}).substring(0, 50)}`;
+    
+    const response = await rateLimiter.request(
+      async () => {
+        return await groq.chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            ...conversationHistory
+          ],
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.7,
+          max_tokens: 300, // Reduzido de 500 para 300 para economizar tokens
+          top_p: 1.0
+        });
+      },
+      350, // Estimativa de tokens (300 resposta + 50 prompt)
+      cacheKey
+    );
 
     const resposta = response.choices[0]?.message?.content || 'Desculpe, não consegui processar sua mensagem no momento.';
 
