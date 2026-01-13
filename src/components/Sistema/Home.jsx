@@ -33,7 +33,7 @@ function MapController({ markers }) {
 
 // Componente de Marcador customizado
 function OrderMarker({ marker, theme }) {
-  const prioridadeColor = marker.prioridade === 'Alta' ? '#ef4444' : marker.prioridade === 'Média' ? '#f59e0b' : '#10b981';
+  const prioridadeColor = marker.prioridade === 'Alta' ? '#ef4444' : marker.prioridade === 'Média' ? '#f59e0b' : '#11A561';
   const statusIcon = marker.status === 'Pendente' ? '⏳' : marker.status === 'Em andamento' ? '🔄' : marker.status === 'Concluída' ? '✅' : marker.status === 'Cancelada' ? '❌' : '⚠️';
   
   const customIcon = L.divIcon({
@@ -111,7 +111,7 @@ function PrestadorMarker({ prestador, theme }) {
         top: 6px;
         left: 6px;
         border-radius: 50%;
-        background: #3b82f6;
+        background: #2C30D5;
         border: 3px solid white;
         display: flex;
         align-items: center;
@@ -155,7 +155,7 @@ function PrestadorMarker({ prestador, theme }) {
       <Popup>
         <div style={{ fontSize: '13px', minWidth: '280px' }}>
           <div style={{ 
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
+            background: 'linear-gradient(135deg, #2C30D5 0%, #2563eb 100%)', 
             color: 'white', 
             padding: '12px', 
             borderRadius: '8px', 
@@ -186,7 +186,7 @@ function PrestadorMarker({ prestador, theme }) {
                 <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
                   🟢 Status
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: '600', color: prestador.isOnline ? '#10b981' : '#ef4444' }}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: prestador.isOnline ? '#11A561' : '#ef4444' }}>
                   {prestador.isOnline ? 'Online' : 'Offline'}
                 </div>
               </div>
@@ -195,7 +195,7 @@ function PrestadorMarker({ prestador, theme }) {
                 <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
                   ✅ Disponível
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: '600', color: prestador.isAvailable ? '#10b981' : '#f59e0b' }}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: prestador.isAvailable ? '#11A561' : '#f59e0b' }}>
                   {prestador.isAvailable ? 'Sim' : 'Ocupado'}
                 </div>
               </div>
@@ -205,7 +205,7 @@ function PrestadorMarker({ prestador, theme }) {
               <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase' }}>
                 ⏱️ Última Atualização
               </div>
-              <div style={{ fontSize: '12px', color: '#10b981', fontWeight: '600' }}>
+              <div style={{ fontSize: '12px', color: '#11A561', fontWeight: '600' }}>
                 {getTempoAtualizacao(prestador.timestamp)}
               </div>
             </div>
@@ -250,7 +250,7 @@ function PrestadorMarker({ prestador, theme }) {
   );
 }
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+const COLORS = ["#2C30D5", "#11A561", "#f59e0b", "#889DD3", "#ec4899", "#32DAF3"];
 
 // Componente do Mapa - Mostra Ordens de Serviço e Prestadores em Tempo Real
 const ServiceOrderMap = ({ ordensServico, theme, companyCnpj, setOrdensServico }) => {
@@ -479,7 +479,7 @@ const ServiceOrderMap = ({ ordensServico, theme, companyCnpj, setOrdensServico }
               alignItems: 'center', 
               gap: '4px',
               padding: '4px 8px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              background: 'linear-gradient(135deg, #2C30D5 0%, #2563eb 100%)',
               borderRadius: '12px',
               color: 'white',
               fontSize: '0.7rem',
@@ -640,14 +640,14 @@ export default function Dashboard() {
     text: "#f8fafc",
     subtext: "#cbd5e1",
     border: "#334155",
-    highlight: "#3b82f6"
+    highlight: "#2C30D5"
   } : {
     bg: "#f1f5f9",
     cardBg: "#ffffff",
     text: "#0f172a",
     subtext: "#64748b",
     border: "#e2e8f0",
-    highlight: "#3b82f6"
+    highlight: "#2C30D5"
   };
 
   return (
@@ -705,7 +705,7 @@ export default function Dashboard() {
           value={new Set(ordensServico.filter(os => os.responsavel).map(os => os.responsavel)).size}
           subtitle={`${ordensServico.length} ordens gerenciadas`}
           theme={theme}
-          gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+          gradient="linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)"
         />
         <MetricCard 
           icon={<FiTruck size={26} />}
@@ -713,7 +713,7 @@ export default function Dashboard() {
           value={ordensServico.length}
           subtitle={`${ordensServico.filter(os => os.status === 'Em andamento').length} em andamento agora`}
           theme={theme}
-          gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+          gradient="linear-gradient(135deg, #889DD3 0%, #2C30D5 100%)"
         />
         <MetricCard 
           icon={<FiAlertCircle size={26} />}
@@ -721,7 +721,7 @@ export default function Dashboard() {
           value={ordensServico.filter(os => os.status === 'Pendente').length}
           subtitle={`${ordensServico.filter(os => os.prioridade === 'Alta' && os.status === 'Pendente').length} de alta prioridade`}
           theme={theme}
-          gradient="linear-gradient(135deg, #fad0c4 0%, #ff6a88 100%)"
+          gradient="linear-gradient(135deg, #fbbf24 0%, #f97316 100%)"
           alert={ordensServico.filter(os => os.status === 'Pendente').length > 5}
         />
         <MetricCard 
@@ -730,7 +730,7 @@ export default function Dashboard() {
           value={ordensServico.length > 0 ? Math.round((ordensServico.filter(os => os.status === 'Concluída').length / ordensServico.length) * 100) + "%" : "0%"}
           subtitle={`${ordensServico.filter(os => os.status === 'Concluída').length} ordens concluídas`}
           theme={theme}
-          gradient="linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
+          gradient="linear-gradient(135deg, #11A561 0%, #0d8550 100%)"
         />
       </div>
 
@@ -768,7 +768,7 @@ export default function Dashboard() {
             return `${media.toFixed(1)}/10`;
           }, [avaliacoes])}
           theme={theme}
-          color="#10b981"
+          color="#11A561"
         />
         <MiniCard 
           icon="📍"
@@ -787,7 +787,7 @@ export default function Dashboard() {
             }).length;
           }, [ordensServico])}
           theme={theme}
-          color="#10b981"
+          color="#11A561"
         />
         <MiniCard 
           icon="🕐"
@@ -811,8 +811,8 @@ export default function Dashboard() {
                   fontWeight: '600', 
                   padding: '4px 10px', 
                   borderRadius: '12px', 
-                  background: '#10b98120', 
-                  color: '#10b981' 
+                  background: '#11A56120', 
+                  color: '#11A561' 
                 }}>
                   {ordensServico.length} OS
                 </span>
@@ -904,7 +904,7 @@ export default function Dashboard() {
               if (!ultimaOS) {
                 return <div style={{ color: theme.subtext, textAlign: "center", padding: "20px" }}>Nenhuma ordem de serviço cadastrada</div>;
               }
-              const prioridadeCor = ultimaOS.prioridade === 'Alta' ? '#ef4444' : ultimaOS.prioridade === 'Média' ? '#f59e0b' : '#10b981';
+              const prioridadeCor = ultimaOS.prioridade === 'Alta' ? '#ef4444' : ultimaOS.prioridade === 'Média' ? '#f59e0b' : '#11A561';
               return (
                 <>
                   <div style={{ marginBottom: "8px" }}>
@@ -977,8 +977,8 @@ export default function Dashboard() {
               }, [avaliacoes])}>
                 <defs>
                   <linearGradient id="colorSatisfacao" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="#11A561" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#11A561" stopOpacity={0.1}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
@@ -988,7 +988,7 @@ export default function Dashboard() {
                 <Area 
                   type="monotone" 
                   dataKey="satisfacao" 
-                  stroke="#10b981" 
+                  stroke="#11A561" 
                   fillOpacity={1} 
                   fill="url(#colorSatisfacao)" 
                   strokeWidth={3}
@@ -1006,7 +1006,7 @@ export default function Dashboard() {
             }}>
               <div style={{ textAlign: "center" }}>
                 <p style={{ margin: "0 0 4px 0", fontSize: "13px", color: theme.subtext }}>Média de Satisfação (Este Mês)</p>
-                <p style={{ margin: 0, fontSize: "24px", fontWeight: 600, color: "#10b981" }}>
+                <p style={{ margin: 0, fontSize: "24px", fontWeight: 600, color: "#11A561" }}>
                   {useMemo(() => {
                     const now = new Date();
                     const mesAtual = now.getMonth() + 1;
@@ -1062,7 +1062,7 @@ export default function Dashboard() {
                       padding: '14px',
                       border: 'none',
                       borderRadius: '8px',
-                      background: '#3b82f6',
+                      background: '#2C30D5',
                       color: 'white',
                       cursor: 'pointer',
                       fontWeight: 600,
@@ -1179,7 +1179,7 @@ export default function Dashboard() {
               <XAxis dataKey="name" stroke={theme.subtext} style={{ fontSize: '10px' }} />
               <YAxis stroke={theme.subtext} style={{ fontSize: '10px' }} />
               <Tooltip contentStyle={{ backgroundColor: theme.cardBg, borderColor: theme.border, color: theme.text, fontSize: '11px' }} />
-              <Bar dataKey="ordens" name="Ordens Abertas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ordens" name="Ordens Abertas" fill="#2C30D5" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -1189,7 +1189,7 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gap: '6px', paddingTop: '6px' }}>
             {useMemo(() => {
               const prioridades = ['Alta', 'Média', 'Baixa'];
-              const cores = { 'Alta': '#ef4444', 'Média': '#f59e0b', 'Baixa': '#10b981' };
+              const cores = { 'Alta': '#ef4444', 'Média': '#f59e0b', 'Baixa': '#11A561' };
               const icons = { 'Alta': '🔴', 'Média': '🟡', 'Baixa': '🟢' };
               
               return prioridades.map(prioridade => {
@@ -1288,7 +1288,7 @@ function Card({ title, children, icon, gridSpan = 1, theme }) {
         left: 0,
         right: 0,
         height: "2px",
-        background: "linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b)",
+        background: "linear-gradient(90deg, #2C30D5, #889DD3, #ec4899, #f59e0b)",
         backgroundSize: "200% 100%",
         animation: "gradientShift 3s ease infinite"
       }} />

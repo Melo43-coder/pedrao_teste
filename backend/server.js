@@ -149,7 +149,13 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
-const client = twilio(accountSid, authToken);
+let client = null;
+if (accountSid && authToken) {
+  client = twilio(accountSid, authToken);
+  console.log('✅ Twilio configurado');
+} else {
+  console.log('⚠️ Twilio não configurado. As funcionalidades de WhatsApp estarão desabilitadas.');
+}
 
 // Armazenar mensagens recebidas em memória (temporário)
 const receivedMessages = [];
@@ -164,6 +170,14 @@ app.post('/api/whatsapp/send', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Número de telefone e mensagem são obrigatórios'
+      });
+    }
+
+    // Verificar se Twilio está configurado
+    if (!client) {
+      return res.status(503).json({
+        success: false,
+        error: 'Serviço de WhatsApp não configurado. Configure as credenciais do Twilio no arquivo .env'
       });
     }
 

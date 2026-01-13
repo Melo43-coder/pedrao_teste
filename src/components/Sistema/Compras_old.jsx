@@ -87,7 +87,7 @@ const styles = {
     border: "none"
   },
   actionButtonPrimary: {
-    backgroundColor: "#0ea5e9",
+    backgroundColor: "#2C30D5",
     color: "white"
   },
   actionButtonSecondary: {
@@ -162,7 +162,7 @@ const styles = {
     marginTop: "8px"
   },
   statTrendPositive: {
-    color: "#10b981"
+    color: "#11A561"
   },
   mainContent: {
     display: "grid",
@@ -185,7 +185,7 @@ const styles = {
     transition: "all 0.2s ease"
   },
   tabButtonActive: {
-    color: "#0ea5e9"
+    color: "#2C30D5"
   },
   tabButtonActiveLine: {
     content: "''",
@@ -194,7 +194,7 @@ const styles = {
     left: 0,
     width: "100%",
     height: "2px",
-    backgroundColor: "#0ea5e9"
+    backgroundColor: "#2C30D5"
   },
   tabContent: {
     backgroundColor: "white",
@@ -234,7 +234,7 @@ const styles = {
   },
   currencyCell: {
     fontFamily: "'Roboto Mono', monospace",
-    color: "#059669"
+    color: "#0d8550"
   },
   centerCell: {
     textAlign: "center"
@@ -255,7 +255,7 @@ const styles = {
     height: "20px",
     border: "2px solid rgba(156, 163, 175, 0.3)",
     borderRadius: "50%",
-    borderTopColor: "#0ea5e9",
+    borderTopColor: "#2C30D5",
     animation: "spin 1s linear infinite",
     marginRight: "8px",
     verticalAlign: "middle"
@@ -407,7 +407,7 @@ const styles = {
     width: "100%",
     padding: "12px",
     borderRadius: "8px",
-    backgroundColor: "#0ea5e9",
+    backgroundColor: "#2C30D5",
     color: "white",
     fontWeight: 600,
     border: "none",
@@ -469,7 +469,7 @@ const styles = {
     color: "#111827"
   },
   detailValueHighlight: {
-    color: "#059669",
+    color: "#0d8550",
     fontWeight: 600
   },
   cardActions: {
@@ -558,7 +558,7 @@ const styles = {
     width: "100%",
     fontSize: "0.9rem",
     fontWeight: 600,
-    color: "#0ea5e9",
+    color: "#2C30D5",
     cursor: "pointer",
     transition: "all 0.2s ease"
   },

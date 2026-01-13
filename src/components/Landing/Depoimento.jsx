@@ -4,7 +4,7 @@ const DEPOIMENTOS = [
   {
     nome: "João Ferreira",
     cargo: "CEO, TechServ",
-    texto: "O Assistus revolucionou a rotina da minha empresa. Extremamente fácil e visual, recomendo!",
+    texto: "O Zillo Assist revolucionou a rotina da minha empresa. Extremamente fácil e visual, recomendo!",
     avatar: "https://randomuser.me/api/portraits/men/32.jpg"
   },
   {
@@ -16,7 +16,7 @@ const DEPOIMENTOS = [
   {
     nome: "Carlos Melo",
     cargo: "Diretor, ConsertaMais",
-    texto: "Depois do Assistus, nosso controle financeiro ficou simples e transparente. Os módulos falam entre si!",
+    texto: "Depois do Zillo Assist, nosso controle financeiro ficou simples e transparente. Os módulos falam entre si!",
     avatar: "https://randomuser.me/api/portraits/men/45.jpg"
   },
   {
@@ -99,7 +99,7 @@ export default function Depoimentos() {
           fontWeight: "700"
         }}
       >
-        Histórias de sucesso com o Assistus
+        Histórias de sucesso com o Zillo Assist
       </h2>
       <div
         style={{

@@ -44,6 +44,9 @@ export default function Configuracoes() {
   const [editingChecklistId, setEditingChecklistId] = useState(null);
   const [editingSeguradoraId, setEditingSeguradoraId] = useState(null);
   const [activeTab, setActiveTab] = useState('checklists');
+  const [multiplaEscolhaOpcoes, setMultiplaEscolhaOpcoes] = useState('');
+  const [showOpcoesInput, setShowOpcoesInput] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
 
   // Carregar CNPJ
   useEffect(() => {
@@ -71,18 +74,31 @@ export default function Configuracoes() {
 
   const adicionarItemChecklist = () => {
     if (checklistItemInput.trim()) {
+      const novoItem = { 
+        id: Date.now(),
+        texto: checklistItemInput, 
+        tipo: checklistItemTipo,
+        obrigatorio: false,
+        dica: ''
+      };
+
+      // Se for múltipla escolha, adicionar as opções
+      if (checklistItemTipo === 'multipla_escolha') {
+        if (!multiplaEscolhaOpcoes.trim()) {
+          alert('❌ Adicione as opções para múltipla escolha (separadas por vírgula)');
+          return;
+        }
+        novoItem.opcoes = multiplaEscolhaOpcoes.split(',').map(op => op.trim()).filter(op => op);
+      }
+
       setNovaChecklist({
         ...novaChecklist,
-        itens: [...novaChecklist.itens, { 
-          id: Date.now(),
-          texto: checklistItemInput, 
-          tipo: checklistItemTipo,
-          obrigatorio: false,
-          dica: ''
-        }]
+        itens: [...novaChecklist.itens, novoItem]
       });
       setChecklistItemInput('');
       setChecklistItemTipo('texto');
+      setMultiplaEscolhaOpcoes('');
+      setShowOpcoesInput(false);
     }
   };
 
@@ -91,6 +107,38 @@ export default function Configuracoes() {
       ...novaChecklist,
       itens: novaChecklist.itens.filter(item => item.id !== itemId)
     });
+  };
+
+  // Funções de Drag and Drop para reordenar itens
+  const handleDragStart = (item) => {
+    setDraggedItem(item);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (targetItem) => {
+    if (!draggedItem || draggedItem.id === targetItem.id) return;
+
+    const items = [...novaChecklist.itens];
+    const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
+    const targetIndex = items.findIndex(item => item.id === targetItem.id);
+
+    // Remove o item da posição original
+    const [removed] = items.splice(draggedIndex, 1);
+    // Insere na nova posição
+    items.splice(targetIndex, 0, removed);
+
+    setNovaChecklist({
+      ...novaChecklist,
+      itens: items
+    });
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
   };
 
   const salvarChecklist = async () => {
@@ -297,7 +345,7 @@ export default function Configuracoes() {
           onClick={() => setActiveTab('checklists')}
           style={{
             padding: '12px 24px',
-            background: activeTab === 'checklists' ? '#667eea' : 'transparent',
+            background: activeTab === 'checklists' ? '#2C30D5' : 'transparent',
             color: activeTab === 'checklists' ? '#fff' : '#64748b',
             border: 'none',
             borderRadius: '8px',
@@ -313,7 +361,7 @@ export default function Configuracoes() {
           onClick={() => setActiveTab('seguradoras')}
           style={{
             padding: '12px 24px',
-            background: activeTab === 'seguradoras' ? '#10b981' : 'transparent',
+            background: activeTab === 'seguradoras' ? '#11A561' : 'transparent',
             color: activeTab === 'seguradoras' ? '#fff' : '#64748b',
             border: 'none',
             borderRadius: '8px',
@@ -349,7 +397,7 @@ export default function Configuracoes() {
                 }}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
@@ -528,7 +576,7 @@ export default function Configuracoes() {
                 }}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
@@ -732,7 +780,7 @@ export default function Configuracoes() {
               {/* Header */}
               <div style={{
                 padding: '24px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                 color: '#fff',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1123,7 +1171,10 @@ export default function Configuracoes() {
                     />
                     <select
                       value={checklistItemTipo}
-                      onChange={(e) => setChecklistItemTipo(e.target.value)}
+                      onChange={(e) => {
+                        setChecklistItemTipo(e.target.value);
+                        setShowOpcoesInput(e.target.value === 'multipla_escolha');
+                      }}
                       style={{
                         padding: '10px',
                         border: '1px solid #e2e8f0',
@@ -1138,12 +1189,13 @@ export default function Configuracoes() {
                       <option value="numero">🔢 Número</option>
                       <option value="data">📅 Data</option>
                       <option value="observacao">💬 Observação</option>
+                      <option value="multipla_escolha">☑️ Múltipla Escolha</option>
                     </select>
                     <button
                       onClick={adicionarItemChecklist}
                       style={{
                         padding: '10px 16px',
-                        background: '#667eea',
+                        background: '#2C30D5',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '8px',
@@ -1155,6 +1207,39 @@ export default function Configuracoes() {
                       + Adicionar
                     </button>
                   </div>
+
+                  {/* Input para opções de múltipla escolha */}
+                  {showOpcoesInput && (
+                    <div style={{
+                      marginBottom: '16px',
+                      padding: '12px',
+                      background: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '8px'
+                    }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#334155', fontSize: '13px' }}>
+                        ☑️ Opções da Múltipla Escolha (separe por vírgula)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Opção 1, Opção 2, Opção 3"
+                        value={multiplaEscolhaOpcoes}
+                        onChange={(e) => setMultiplaEscolhaOpcoes(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontFamily: 'inherit',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#64748b' }}>
+                        💡 Digite as opções separadas por vírgula. Ex: "Sim, Não, Não se aplica"
+                      </p>
+                    </div>
+                  )}
 
                   {novaChecklist.itens.length === 0 ? (
                     <div style={{
@@ -1172,18 +1257,39 @@ export default function Configuracoes() {
                       {novaChecklist.itens.map((item, idx) => (
                         <div
                           key={item.id}
+                          draggable
+                          onDragStart={() => handleDragStart(item)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(item)}
+                          onDragEnd={handleDragEnd}
                           style={{
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '12px',
                             padding: '16px',
-                            background: item.obrigatorio ? '#fef3c7' : '#f8fafc',
-                            border: item.obrigatorio ? '2px solid #f59e0b' : '1px solid #e2e8f0',
+                            background: draggedItem?.id === item.id ? '#e0e7ff' : (item.obrigatorio ? '#fef3c7' : '#f8fafc'),
+                            border: draggedItem?.id === item.id ? '2px dashed #2C30D5' : (item.obrigatorio ? '2px solid #f59e0b' : '1px solid #e2e8f0'),
                             borderRadius: '8px',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            cursor: 'grab',
+                            opacity: draggedItem?.id === item.id ? 0.5 : 1
                           }}
                         >
                           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                            {/* Ícone de arrastar */}
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              gap: '2px',
+                              cursor: 'grab',
+                              padding: '4px',
+                              color: '#94a3b8'
+                            }}>
+                              <div style={{ width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }}></div>
+                              <div style={{ width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }}></div>
+                              <div style={{ width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }}></div>
+                            </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ 
                                 fontSize: '14px', 
@@ -1234,14 +1340,28 @@ export default function Configuracoes() {
                                   {item.tipo === 'numero' && '🔢 Número'}
                                   {item.tipo === 'data' && '📅 Data'}
                                   {item.tipo === 'observacao' && '💬 Observação'}
+                                  {item.tipo === 'multipla_escolha' && '☑️ Múltipla Escolha'}
                                 </span>
                               </div>
+                              {item.tipo === 'multipla_escolha' && item.opcoes && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '8px',
+                                  background: '#f0f9ff',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  color: '#0369a1'
+                                }}>
+                                  <strong>Opções:</strong> {item.opcoes.join(', ')}
+                                </div>
+                              )}
                               {item.dica && (
                                 <div style={{
                                   marginTop: '8px',
                                   padding: '8px',
                                   background: '#e0f2fe',
-                                  borderLeft: '3px solid #0ea5e9',
+                                  borderLeft: '3px solid #2C30D5',
                                   borderRadius: '4px',
                                   fontSize: '12px',
                                   color: '#0c4a6e'
@@ -1360,7 +1480,7 @@ export default function Configuracoes() {
                   onClick={salvarChecklist}
                   style={{
                     padding: '10px 20px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '8px',
@@ -1416,7 +1536,7 @@ export default function Configuracoes() {
             >
               <div style={{
                 padding: '24px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                 color: '#fff',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1620,7 +1740,7 @@ export default function Configuracoes() {
                   onClick={salvarSeguradora}
                   style={{
                     padding: '10px 20px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '8px',

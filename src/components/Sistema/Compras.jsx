@@ -333,7 +333,7 @@ export default function Compras() {
       cursor: "pointer",
       transition: "all 0.2s ease",
       border: "none",
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     tabsContainer: {
@@ -352,8 +352,8 @@ export default function Compras() {
       transition: "all 0.2s ease"
     },
     tabActive: {
-      color: "#0ea5e9",
-      borderBottomColor: "#0ea5e9"
+      color: "#2C30D5",
+      borderBottomColor: "#2C30D5"
     },
     card: {
       backgroundColor: "white",
@@ -449,7 +449,7 @@ export default function Compras() {
     submitButton: {
       flex: 1,
       padding: "10px 16px",
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white",
       border: "none",
       borderRadius: "8px",
@@ -492,7 +492,7 @@ export default function Compras() {
       width: "20px",
       height: "20px",
       border: "3px solid #f3f4f6",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       borderRadius: "50%",
       animation: "spin 1s linear infinite"
     }
@@ -546,13 +546,13 @@ export default function Compras() {
             ➕ Novo Fornecedor
           </button>
           <button
-            style={{ ...styles.actionButton, backgroundColor: "#10b981" }}
+            style={{ ...styles.actionButton, backgroundColor: "#11A561" }}
             onClick={() => setShowNewProductForm(true)}
           >
             ➕ Novo Produto
           </button>
           <button
-            style={{ ...styles.actionButton, backgroundColor: "#8b5cf6" }}
+            style={{ ...styles.actionButton, backgroundColor: "#889DD3" }}
             onClick={() => setShowStockModal(true)}
           >
             📦 Gerenciar Estoque

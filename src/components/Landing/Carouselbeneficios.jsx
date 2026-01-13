@@ -18,7 +18,7 @@ const BENEFICIOS = [
           fontSize: "1.65rem",
           marginBottom: 38,
         }}>
-          Por que escolher o ASSISTUS?
+          Por que escolher o ZILLO ASSIST?
         </h2>
         <div style={{
           display: "flex",

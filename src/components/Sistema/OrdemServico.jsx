@@ -15,16 +15,16 @@ import jsPDF from 'jspdf';
 // Dados de status e prioridades
 const OSSTATUS = [
   { nome: "Pendente", cor: "#f59e0b", bgColor: "#fef3c7", icon: <FiClock /> },
-  { nome: "Em andamento", cor: "#3b82f6", bgColor: "#dbeafe", icon: <FiActivity /> },
-  { nome: "Aguardando Peça", cor: "#8b5cf6", bgColor: "#ede9fe", icon: <FiAlertTriangle /> },
-  { nome: "Concluída", cor: "#10b981", bgColor: "#d1fae5", icon: <FiCheckCircle /> },
+  { nome: "Em andamento", cor: "#2C30D5", bgColor: "#e8e9fb", icon: <FiActivity /> },
+  { nome: "Aguardando Peça", cor: "#889DD3", bgColor: "#ede9fe", icon: <FiAlertTriangle /> },
+  { nome: "Concluída", cor: "#11A561", bgColor: "#d4f4e5", icon: <FiCheckCircle /> },
   { nome: "Cancelada", cor: "#ef4444", bgColor: "#fee2e2", icon: <FiXCircle /> }
 ];
 
 const PRIORIDADES = [
   { nome: "Alta", cor: "#ef4444", bgColor: "#fee2e2" },
   { nome: "Média", cor: "#f59e0b", bgColor: "#fef3c7" },
-  { nome: "Baixa", cor: "#10b981", bgColor: "#d1fae5" }
+  { nome: "Baixa", cor: "#11A561", bgColor: "#d4f4e5" }
 ];
 
 // Funções de estilo
@@ -470,17 +470,17 @@ export default function OrdemServico() {
       };
       
       // ========== CABEÇALHO ==========
-      pdf.setFillColor(0, 0, 0);
-      pdf.rect(0, 0, pageWidth, 45, 'F');
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, 26, 'F');
       
       // Logo da empresa/checklist (se existir)
       console.log('🖼️ Verificando logo:', checklistPrestador.logoBase64 ? 'Logo encontrada' : 'Sem logo');
       if (checklistPrestador.logoBase64) {
         try {
-          const logoWidth = 30;
-          const logoHeight = 30;
+          const logoWidth = 22;
+          const logoHeight = 22;
           const logoX = margin;
-          const logoY = 7.5;
+          const logoY = 2;
           pdf.addImage(checklistPrestador.logoBase64, 'PNG', logoX, logoY, logoWidth, logoHeight);
           console.log('✅ Logo adicionada ao PDF com sucesso');
         } catch (error) {
@@ -488,96 +488,98 @@ export default function OrdemServico() {
         }
       }
       
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(20);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('ORDEM DE SERVIÇO', pageWidth / 2, 15, { align: 'center' });
-      
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      const empresaNome = localStorage.getItem('companyName') || 'EMPRESA DE ASSISTÊNCIA TÉCNICA';
-      pdf.text(empresaNome.toUpperCase(), pageWidth / 2, 23, { align: 'center' });
-      
-      const empresaCNPJ = companyCnpj || 'NÃO INFORMADO';
-      pdf.text(`CNPJ: ${empresaCNPJ}`, pageWidth / 2, 29, { align: 'center' });
+      pdf.text('CHECKLIST', pageWidth / 2, 10, { align: 'center' });
       
       pdf.setFontSize(8);
-      pdf.text('Ordem de serviço impressa pelo sistema', pageWidth / 2, 38, { align: 'center' });
+      pdf.setFont('helvetica', 'normal');
+      const empresaCNPJ = companyCnpj || 'NÃO INFORMADO';
+      pdf.text(`CNPJ: ${empresaCNPJ}`, pageWidth / 2, 16, { align: 'center' });
       
-      yPosition = 50;
+      // Adicionar Horário de Chegada no header
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      if (checklistPrestador.etapa1 && checklistPrestador.etapa1.horaReconhecimento) {
+        const horarioChegada = new Date(checklistPrestador.etapa1.horaReconhecimento).toLocaleString('pt-BR');
+        pdf.text(`Horário de chegada: ${horarioChegada}`, pageWidth / 2, 22, { align: 'center' });
+      }
+      
+      yPosition = 29;
       
       // ========== DADOS DA ASSISTÊNCIA ==========
       pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(12);
+      pdf.setFontSize(11);
       pdf.setFont('helvetica', 'bold');
       pdf.text('DADOS DA ASSISTÊNCIA', margin, yPosition);
-      yPosition += 2;
+      yPosition += 1;
       addHorizontalLine(yPosition);
-      yPosition += 8;
+      yPosition += 5;
       
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
       pdf.text('OS Nº:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`#${detalhesOS.codigo}`, margin + 20, yPosition);
+      pdf.text(`#${detalhesOS.codigo}`, margin + 18, yPosition);
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Data/Hora:', pageWidth / 2, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(new Date().toLocaleString('pt-BR'), pageWidth / 2 + 25, yPosition);
-      yPosition += 6;
+      pdf.text(new Date().toLocaleString('pt-BR'), pageWidth / 2 + 22, yPosition);
+      yPosition += 4.5;
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Profissional:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.responsavel), margin + 28, yPosition);
-      yPosition += 6;
+      pdf.text(safeText(detalhesOS.responsavel), margin + 26, yPosition);
+      yPosition += 4.5;
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Produto/Serviço:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.descricao).substring(0, 80), margin + 35, yPosition);
-      yPosition += 6;
+      pdf.text(safeText(detalhesOS.descricao).substring(0, 80), margin + 33, yPosition);
+      yPosition += 4.5;
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Endereço:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
       const enderecoCompleto = `${safeText(detalhesOS.endereco)}, ${safeText(detalhesOS.numero)} - ${safeText(detalhesOS.cidade)}/${safeText(detalhesOS.estado)}`;
-      const enderecoLines = pdf.splitTextToSize(enderecoCompleto, contentWidth - 25);
-      pdf.text(enderecoLines, margin + 25, yPosition);
-      yPosition += enderecoLines.length * 5 + 8;
+      const enderecoLines = pdf.splitTextToSize(enderecoCompleto, contentWidth - 23);
+      pdf.text(enderecoLines, margin + 23, yPosition);
+      yPosition += enderecoLines.length * 4 + 5;
       
       // ========== DADOS DO CLIENTE/SEGURADO ==========
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
+      pdf.setFontSize(11);
       pdf.text('DADOS DO CLIENTE', margin, yPosition);
-      yPosition += 2;
+      yPosition += 1;
       addHorizontalLine(yPosition);
-      yPosition += 8;
+      yPosition += 5;
       
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Nome:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.nomeCliente), margin + 20, yPosition);
-      yPosition += 6;
+      pdf.text(safeText(detalhesOS.nomeCliente), margin + 18, yPosition);
+      yPosition += 4.5;
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Telefone:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.telefoneCliente), margin + 25, yPosition);
+      pdf.text(safeText(detalhesOS.telefoneCliente), margin + 23, yPosition);
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('E-mail:', pageWidth / 2, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.emailCliente), pageWidth / 2 + 18, yPosition);
-      yPosition += 6;
+      pdf.text(safeText(detalhesOS.emailCliente), pageWidth / 2 + 16, yPosition);
+      yPosition += 4.5;
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('CEP:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.cep), margin + 15, yPosition);
-      yPosition += 10;
+      pdf.text(safeText(detalhesOS.cep), margin + 13, yPosition);
+      yPosition += 6;
       
       // ========== DETALHAMENTO DO SERVIÇO ==========
       if (yPosition > pageHeight - 60) {
@@ -586,40 +588,40 @@ export default function OrdemServico() {
       }
       
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
+      pdf.setFontSize(11);
       pdf.text('DETALHAMENTO DO SERVIÇO', margin, yPosition);
-      yPosition += 2;
+      yPosition += 1;
       addHorizontalLine(yPosition);
-      yPosition += 8;
+      yPosition += 5;
       
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Status:', margin, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.status), margin + 20, yPosition);
+      pdf.text(safeText(detalhesOS.status), margin + 18, yPosition);
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Prioridade:', pageWidth / 2, yPosition);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(safeText(detalhesOS.prioridade), pageWidth / 2 + 25, yPosition);
-      yPosition += 6;
+      pdf.text(safeText(detalhesOS.prioridade), pageWidth / 2 + 23, yPosition);
+      yPosition += 4.5;
       
       if (checklistPrestador.etapa1 && checklistPrestador.etapa1.horaReconhecimento) {
         pdf.setFont('helvetica', 'bold');
         pdf.text('Situação:', margin, yPosition);
         pdf.setFont('helvetica', 'normal');
         const situacao = checklistPrestador.etapa1.dadosConfirmados ? 'CONFIRMADO' : 'PENDENTE';
-        pdf.text(situacao, margin + 23, yPosition);
-        yPosition += 6;
+        pdf.text(situacao, margin + 21, yPosition);
+        yPosition += 4.5;
       }
       
       pdf.setFont('helvetica', 'bold');
       pdf.text('Observações:', margin, yPosition);
-      yPosition += 5;
+      yPosition += 4;
       pdf.setFont('helvetica', 'normal');
       const obsLines = pdf.splitTextToSize(safeText(detalhesOS.descricao), contentWidth - 5);
       pdf.text(obsLines, margin + 5, yPosition);
-      yPosition += obsLines.length * 5 + 10;
+      yPosition += obsLines.length * 4 + 6;
       
       // ========== CHECKLIST DE EXECUÇÃO ==========
       if (yPosition > pageHeight - 50) {
@@ -628,45 +630,37 @@ export default function OrdemServico() {
       }
       
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(12);
+      pdf.setFontSize(11);
       pdf.text('CHECKLIST DE EXECUÇÃO', margin, yPosition);
-      yPosition += 2;
+      yPosition += 1;
       addHorizontalLine(yPosition);
-      yPosition += 8;
+      yPosition += 5;
       
       // === ANTES DA EXECUÇÃO ===
       if (checklistPrestador.etapa1) {
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.text('ANTES DA EXECUÇÃO', margin, yPosition);
-        yPosition += 6;
-        
         pdf.setFontSize(10);
+        pdf.text('ANTES DA EXECUÇÃO', margin, yPosition);
+        yPosition += 4.5;
         
-        if (checklistPrestador.etapa1.horaReconhecimento) {
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('[ ] Reconhecimento realizado em:', margin + 5, yPosition);
-          pdf.setFont('helvetica', 'normal');
-          pdf.text(new Date(checklistPrestador.etapa1.horaReconhecimento).toLocaleString('pt-BR'), margin + 75, yPosition);
-          yPosition += 6;
-        }
+        pdf.setFontSize(9);
         
         if (checklistPrestador.etapa1.dadosConfirmados !== undefined) {
           const checkbox = checklistPrestador.etapa1.dadosConfirmados ? '[X]' : '[ ]';
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(`${checkbox} Dados do cliente confirmados`, margin + 5, yPosition);
-          yPosition += 6;
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`${checkbox} Dados do cliente confirmados`, margin + 3, yPosition);
+          yPosition += 4.5;
         }
         
         if (checklistPrestador.estado) {
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('[ ] Localização verificada:', margin + 5, yPosition);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(safeText(checklistPrestador.estado), margin + 60, yPosition);
-          yPosition += 6;
+          pdf.text('[ ] Localização verificada:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(safeText(checklistPrestador.estado), margin + 50, yPosition);
+          yPosition += 4.5;
         }
         
-        yPosition += 4;
+        yPosition += 2;
       }
       
       // === DURANTE A EXECUÇÃO ===
@@ -677,11 +671,11 @@ export default function OrdemServico() {
         }
         
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.text('DURANTE A EXECUÇÃO', margin, yPosition);
-        yPosition += 6;
-        
         pdf.setFontSize(10);
+        pdf.text('DURANTE A EXECUÇÃO', margin, yPosition);
+        yPosition += 4.5;
+        
+        pdf.setFontSize(9);
         
         // Itens do checklist
         if (checklistPrestador.etapa2.checklist && checklistPrestador.etapa2.checklist.length > 0) {
@@ -692,19 +686,63 @@ export default function OrdemServico() {
             }
             
             const checkbox = item.checked ? '[X]' : '[ ]';
-            const obrigatorio = item.obrigatorio ? '*' : ' ';
+            const obrigatorio = item.obrigatorio ? '*' : '';
             
             pdf.setFont('helvetica', 'normal');
-            pdf.text(`${checkbox} ${obrigatorio} ${safeText(item.label, 'Item')}`, margin + 5, yPosition);
-            yPosition += 5;
+            
+            // Tratamento especial para múltipla escolha
+            if (item.tipo === 'multipla_escolha') {
+              const itemTitle = `${checkbox}${obrigatorio} ${safeText(item.label, 'Item')}`;
+              const titleLines = pdf.splitTextToSize(itemTitle, contentWidth - 6);
+              pdf.text(titleLines, margin + 3, yPosition);
+              yPosition += titleLines.length * 3.5;
+              
+              // Mostrar apenas as opções selecionadas
+              if (item.opçõesSelecionadas && item.opçõesSelecionadas.length > 0) {
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'italic');
+                item.opçõesSelecionadas.forEach(opcao => {
+                  const opcaoText = `    ✓ ${safeText(opcao, 'Opção')}`;
+                  const opcaoLines = pdf.splitTextToSize(opcaoText, contentWidth - 10);
+                  pdf.text(opcaoLines, margin + 3, yPosition);
+                  yPosition += opcaoLines.length * 3.5;
+                });
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'normal');
+              } else if (item.opcoes && Array.isArray(item.opcoes)) {
+                // Fallback: se opçõesSelecionadas não existir, mostrar todas com indicação de seleção
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'italic');
+                item.opcoes.forEach(opcao => {
+                  const isSelecionada = typeof opcao === 'object' ? opcao.selecionada : false;
+                  const nomeOpcao = typeof opcao === 'object' ? opcao.nome : opcao;
+                  if (isSelecionada) {
+                    const opcaoText = `    ✓ ${safeText(nomeOpcao, 'Opção')}`;
+                    const opcaoLines = pdf.splitTextToSize(opcaoText, contentWidth - 10);
+                    pdf.text(opcaoLines, margin + 3, yPosition);
+                    yPosition += opcaoLines.length * 3.5;
+                  }
+                });
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'normal');
+              }
+            } else {
+              // Comportamento padrão para outros tipos
+              const itemText = `${checkbox}${obrigatorio} ${safeText(item.label, 'Item')}`;
+              const maxWidth = contentWidth - 6;
+              const textLines = pdf.splitTextToSize(itemText, maxWidth);
+              
+              pdf.text(textLines, margin + 3, yPosition);
+              yPosition += textLines.length * 3.5;
+            }
             
             if (item.obs) {
               pdf.setFont('helvetica', 'italic');
-              pdf.setFontSize(9);
+              pdf.setFontSize(8);
               const obsLines = pdf.splitTextToSize(`    Obs: ${item.obs}`, contentWidth - 10);
-              pdf.text(obsLines, margin + 5, yPosition);
-              yPosition += obsLines.length * 4 + 2;
-              pdf.setFontSize(10);
+              pdf.text(obsLines, margin + 3, yPosition);
+              yPosition += obsLines.length * 3.5 + 1;
+              pdf.setFontSize(9);
             }
             
             if (item.tipo === 'foto' && item.foto) {
@@ -760,7 +798,7 @@ export default function OrdemServico() {
             }
           });
           
-          yPosition += 4;
+          yPosition += 2;
         }
         
         if (checklistPrestador.etapa2.observacoesGerais) {
@@ -770,23 +808,23 @@ export default function OrdemServico() {
           }
           
           pdf.setFont('helvetica', 'bold');
-          pdf.text('Observações Gerais:', margin + 5, yPosition);
-          yPosition += 5;
+          pdf.text('Observações Gerais:', margin + 3, yPosition);
+          yPosition += 4;
           pdf.setFont('helvetica', 'normal');
           const obsLines = pdf.splitTextToSize(checklistPrestador.etapa2.observacoesGerais, contentWidth - 10);
-          pdf.text(obsLines, margin + 5, yPosition);
-          yPosition += obsLines.length * 5 + 4;
+          pdf.text(obsLines, margin + 3, yPosition);
+          yPosition += obsLines.length * 4 + 2;
         }
         
         if (checklistPrestador.etapa2.horaFinalizacao) {
           pdf.setFont('helvetica', 'bold');
-          pdf.text('[ ] Execução finalizada em:', margin + 5, yPosition);
+          pdf.text('[ ] Execução finalizada em:', margin + 3, yPosition);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(new Date(checklistPrestador.etapa2.horaFinalizacao).toLocaleString('pt-BR'), margin + 65, yPosition);
-          yPosition += 6;
+          pdf.text(new Date(checklistPrestador.etapa2.horaFinalizacao).toLocaleString('pt-BR'), margin + 58, yPosition);
+          yPosition += 4.5;
         }
         
-        yPosition += 4;
+        yPosition += 2;
       }
       
       
@@ -798,48 +836,49 @@ export default function OrdemServico() {
         }
         
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11);
-        pdf.text('APÓS A EXECUÇÃO', margin, yPosition);
-        yPosition += 6;
-        
         pdf.setFontSize(10);
+        pdf.text('APÓS A EXECUÇÃO', margin, yPosition);
+        yPosition += 4.5;
+        
+        pdf.setFontSize(9);
         
         if (checklistPrestador.etapa3.duracaoTotal) {
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('[ ] Duração total do serviço:', margin + 5, yPosition);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(safeText(checklistPrestador.etapa3.duracaoTotal), margin + 65, yPosition);
-          yPosition += 6;
+          pdf.text('[ ] Duração total do serviço:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(safeText(checklistPrestador.etapa3.duracaoTotal), margin + 58, yPosition);
+          yPosition += 4.5;
         }
         
         if (checklistPrestador.etapa3.horaFinalizacaoTotal) {
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('[ ] Serviço concluído em:', margin + 5, yPosition);
           pdf.setFont('helvetica', 'normal');
-          pdf.text(new Date(checklistPrestador.etapa3.horaFinalizacaoTotal).toLocaleString('pt-BR'), margin + 60, yPosition);
-          yPosition += 6;
+          pdf.text('[ ] Serviço concluído em:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(new Date(checklistPrestador.etapa3.horaFinalizacaoTotal).toLocaleString('pt-BR'), margin + 53, yPosition);
+          yPosition += 4.5;
         }
         
         const garantia = checklistPrestador.etapa3.garantia !== undefined ? 
           (checklistPrestador.etapa3.garantia ? '[X] Sim  [ ] Não' : '[ ] Sim  [X] Não') : 
           '[ ] Sim  [ ] Não';
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`[ ] Garantia aplicada: ${garantia}`, margin + 5, yPosition);
-        yPosition += 8;
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`[ ] Garantia aplicada: ${garantia}`, margin + 3, yPosition);
+        yPosition += 5;
         
         if (checklistPrestador.etapa3.observacoesRevisao) {
           pdf.setFont('helvetica', 'bold');
-          pdf.text('Observações da Revisão:', margin + 5, yPosition);
-          yPosition += 5;
+          pdf.text('Observações da Revisão:', margin + 3, yPosition);
+          yPosition += 4;
           pdf.setFont('helvetica', 'normal');
           const obsLines = pdf.splitTextToSize(checklistPrestador.etapa3.observacoesRevisao, contentWidth - 10);
-          pdf.text(obsLines, margin + 5, yPosition);
-          yPosition += obsLines.length * 5 + 8;
+          pdf.text(obsLines, margin + 3, yPosition);
+          yPosition += obsLines.length * 4 + 4;
         }
         
         // Assinatura do cliente
         if (checklistPrestador.etapa3.assinaturaBase64) {
-          if (yPosition > pageHeight - 70) {
+          // Verificar se há espaço suficiente para assinatura completa (imagem + textos)
+          if (yPosition > pageHeight - 80) {
             pdf.addPage();
             yPosition = margin;
           }
@@ -865,20 +904,23 @@ export default function OrdemServico() {
             yPosition += 35;
           }
           
+          // Linha horizontal para assinatura
           pdf.setDrawColor(0, 0, 0);
           pdf.setLineWidth(0.3);
           pdf.line(margin, yPosition, margin + 80, yPosition);
           yPosition += 5;
           
+          // Texto "Assinatura: NÃO INFORMADO"
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(9);
-          pdf.text(`Assinatura: ${safeText(detalhesOS.nomeCliente)}`, margin, yPosition);
-          yPosition += 8;
+          pdf.text('Assinatura: NÃO INFORMADO', margin, yPosition);
+          yPosition += 6;
           
-          pdf.text(`Data: _____/_____/_____`, margin, yPosition);
+          // Texto "Data: _____/_____/_____"
+          pdf.text('Data: _____/_____/_____', margin, yPosition);
         } else {
           // Espaço para assinatura manual
-          if (yPosition > pageHeight - 50) {
+          if (yPosition > pageHeight - 60) {
             pdf.addPage();
             yPosition = margin;
           }
@@ -892,18 +934,20 @@ export default function OrdemServico() {
           pdf.text('ASSINATURA DO CLIENTE/SEGURADO', margin, yPosition);
           yPosition += 25;
           
+          // Linha horizontal para assinatura manual
           pdf.setDrawColor(0, 0, 0);
           pdf.setLineWidth(0.3);
           pdf.line(margin, yPosition, margin + 80, yPosition);
           yPosition += 5;
           
+          // Texto "Assinatura: NÃO INFORMADO"
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(9);
-          pdf.text('Assinatura', margin, yPosition);
-          yPosition += 8;
+          pdf.text('Assinatura: NÃO INFORMADO', margin, yPosition);
+          yPosition += 6;
           
-          pdf.line(margin + 100, yPosition - 13, margin + 160, yPosition - 13);
-          pdf.text('Data: _____/_____/_____', margin + 100, yPosition);
+          // Texto "Data: _____/_____/_____"
+          pdf.text('Data: _____/_____/_____', margin, yPosition);
         }
       }
       
@@ -1487,11 +1531,11 @@ export default function OrdemServico() {
     formBg: "#1f2937",
     inputBg: "#374151",
     inputText: "#f9fafb",
-    buttonBg: "#0ea5e9",
+    buttonBg: "#2C30D5",
     buttonText: "#f9fafb",
     cancelButtonBg: "#4b5563",
     cancelButtonText: "#f9fafb",
-    highlight: "#0ea5e9"
+    highlight: "#32DAF3"
   } : {
     bg: "#f8fafc",
     cardBg: "#ffffff",
@@ -1505,11 +1549,11 @@ export default function OrdemServico() {
     formBg: "#f0f9ff",
     inputBg: "#ffffff",
     inputText: "#0f172a",
-    buttonBg: "#0ea5e9",
+    buttonBg: "#2C30D5",
     buttonText: "#ffffff",
     cancelButtonBg: "#f1f5f9",
     cancelButtonText: "#64748b",
-    highlight: "#0ea5e9"
+    highlight: "#32DAF3"
   };
 
   return (
@@ -1971,7 +2015,7 @@ export default function OrdemServico() {
                     onClick={() => setNova(prev => ({ ...prev, codigo: gerarCodigoAleatorio() }))}
                     style={{
                       padding: "10px 16px",
-                      background: "#667eea",
+                      background: "#2C30D5",
                       color: "white",
                       border: "none",
                       borderRadius: "8px",
@@ -1981,8 +2025,8 @@ export default function OrdemServico() {
                       whiteSpace: "nowrap",
                       transition: "all 0.2s ease"
                     }}
-                    onMouseOver={e => e.currentTarget.style.background = "#5568d3"}
-                    onMouseOut={e => e.currentTarget.style.background = "#667eea"}
+                    onMouseOver={e => e.currentTarget.style.background = "#889DD3"}
+                    onMouseOut={e => e.currentTarget.style.background = "#2C30D5"}
                   >
                     🎲 Gerar
                   </button>
@@ -2842,11 +2886,11 @@ export default function OrdemServico() {
                               title="Concluir" 
                               onClick={() => changeStatus(os.codigo, "Concluída")}
                               style={{
-                                background: "#10b98115",
+                                background: "#11A56115",
                                 border: "none",
                                 borderRadius: "4px",
                                 padding: "clamp(3px, 0.8vw, 6px)",
-                                color: "#10b981",
+                                color: "#11A561",
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
@@ -3477,7 +3521,7 @@ export default function OrdemServico() {
                               width: "32px",
                               height: "32px",
                               borderRadius: "50%",
-                              backgroundColor: "#10b981", // Verde para prestador
+                              backgroundColor: "#11A561", // Verde para prestador
                               color: "white",
                               display: "flex",
                               alignItems: "center",
@@ -3496,7 +3540,7 @@ export default function OrdemServico() {
                               maxWidth: "70%",
                               padding: "10px 14px",
                               borderRadius: msg.enviado ? "12px 12px 0 12px" : "12px 12px 12px 0", // Ponta do balão
-                              backgroundColor: msg.enviado ? "#0ea5e9" : "#dcfce7", // Base azul, Prestador verde claro
+                              backgroundColor: msg.enviado ? "#2C30D5" : "#dcfce7", // Base azul, Prestador verde claro
                               color: msg.enviado ? "#ffffff" : "#000",
                               fontSize: "0.85rem",
                               wordBreak: "break-word",
@@ -3507,7 +3551,7 @@ export default function OrdemServico() {
                             <div style={{
                               fontSize: "0.7rem",
                               fontWeight: "700",
-                              color: msg.enviado ? "#ffffff" : "#10b981",
+                              color: msg.enviado ? "#ffffff" : "#11A561",
                               marginBottom: "4px",
                               opacity: 0.9
                             }}>
@@ -3553,7 +3597,7 @@ export default function OrdemServico() {
                               width: "32px",
                               height: "32px",
                               borderRadius: "50%",
-                              backgroundColor: "#0369a1", // Azul escuro para base
+                              backgroundColor: "#889DD3", // Azul secundário para base
                               color: "white",
                               display: "flex",
                               alignItems: "center",
@@ -3768,41 +3812,169 @@ export default function OrdemServico() {
                             {/* Checklist Items */}
                             {checklistPrestador.etapa2.checklist && checklistPrestador.etapa2.checklist.length > 0 && (
                               <div style={{ marginBottom: "16px" }}>
-                                <h5 style={{ margin: "0 0 12px 0", color: theme.text, fontSize: "0.95rem" }}>
+                                <h5 style={{ margin: "0 0 16px 0", color: theme.text, fontSize: "0.95rem" }}>
                                   📋 Itens do Checklist
                                 </h5>
+                                
+                                {/* Resumo de Progresso */}
+                                {(() => {
+                                  const totalItens = checklistPrestador.etapa2.checklist.length;
+                                  const itensCompletos = checklistPrestador.etapa2.checklist.filter(item => item.checked).length;
+                                  const itensObrigatorios = checklistPrestador.etapa2.checklist.filter(item => item.obrigatorio).length;
+                                  const obrigatoriosCompletos = checklistPrestador.etapa2.checklist.filter(item => item.obrigatorio && item.checked).length;
+                                  const percentualCompleto = Math.round((itensCompletos / totalItens) * 100);
+                                  
+                                  return (
+                                    <div style={{
+                                      padding: "16px",
+                                      background: "linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)",
+                                      border: "2px solid #32DAF3",
+                                      borderRadius: "10px",
+                                      marginBottom: "20px",
+                                      boxShadow: "0 2px 8px rgba(50, 218, 243, 0.15)"
+                                    }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                                        <div>
+                                          <h6 style={{ margin: "0 0 4px 0", color: "#0c4a6e", fontSize: "0.85rem", fontWeight: "700" }}>
+                                            📊 PROGRESSO DO CHECKLIST
+                                          </h6>
+                                          <p style={{ margin: 0, color: "#0369a1", fontSize: "0.8rem" }}>
+                                            {itensCompletos} de {totalItens} itens concluídos
+                                          </p>
+                                        </div>
+                                        <div style={{
+                                          background: percentualCompleto === 100 ? "#11A561" : "#32DAF3",
+                                          color: "white",
+                                          padding: "8px 16px",
+                                          borderRadius: "20px",
+                                          fontSize: "1.1rem",
+                                          fontWeight: "700"
+                                        }}>
+                                          {percentualCompleto}%
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Barra de progresso */}
+                                      <div style={{
+                                        width: "100%",
+                                        height: "12px",
+                                        background: "#e0f2fe",
+                                        borderRadius: "6px",
+                                        overflow: "hidden",
+                                        marginBottom: "12px"
+                                      }}>
+                                        <div style={{
+                                          width: `${percentualCompleto}%`,
+                                          height: "100%",
+                                          background: percentualCompleto === 100 
+                                            ? "linear-gradient(90deg, #11A561 0%, #0d8f51 100%)"
+                                            : "linear-gradient(90deg, #32DAF3 0%, #2C30D5 100%)",
+                                          transition: "width 0.5s ease"
+                                        }}></div>
+                                      </div>
+                                      
+                                      {/* Status dos obrigatórios */}
+                                      {itensObrigatorios > 0 && (
+                                        <div style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "8px",
+                                          padding: "8px",
+                                          background: obrigatoriosCompletos === itensObrigatorios ? "#d4f4e5" : "#fef3c7",
+                                          borderRadius: "6px",
+                                          border: `1px solid ${obrigatoriosCompletos === itensObrigatorios ? "#11A561" : "#f59e0b"}`
+                                        }}>
+                                          <span style={{ fontSize: "1.2rem" }}>
+                                            {obrigatoriosCompletos === itensObrigatorios ? "✅" : "⚠️"}
+                                          </span>
+                                          <span style={{
+                                            color: obrigatoriosCompletos === itensObrigatorios ? "#0a7340" : "#92400e",
+                                            fontSize: "0.85rem",
+                                            fontWeight: "600"
+                                          }}>
+                                            Itens Obrigatórios: {obrigatoriosCompletos}/{itensObrigatorios}
+                                            {obrigatoriosCompletos === itensObrigatorios ? " - Todos concluídos!" : " - Pendentes"}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                                
                                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                                   {checklistPrestador.etapa2.checklist.map((item, index) => (
                                     <div
                                       key={item.id || index}
                                       style={{
-                                        padding: "12px",
-                                        background: item.obrigatorio ? "#fef3c7" : theme.bg,
-                                        border: `1px solid ${theme.border}`,
-                                        borderRadius: "6px"
+                                        padding: "14px",
+                                        background: item.checked 
+                                          ? 'linear-gradient(135deg, #d4f4e5 0%, #e6f9f0 100%)'
+                                          : item.obrigatorio 
+                                          ? "#fef3c7" 
+                                          : theme.bg,
+                                        border: item.checked 
+                                          ? "2px solid #11A561"
+                                          : `2px solid ${theme.border}`,
+                                        borderRadius: "8px",
+                                        boxShadow: item.checked ? "0 2px 8px rgba(17, 165, 97, 0.15)" : "none",
+                                        transition: "all 0.3s ease"
                                       }}
                                     >
-                                      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "8px" }}>
-                                        <span style={{ fontSize: "1.2rem" }}>
+                                      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "8px" }}>
+                                        <span style={{ 
+                                          fontSize: "1.8rem",
+                                          lineHeight: 1,
+                                          minWidth: "30px"
+                                        }}>
                                           {item.checked ? '✅' : '⬜'}
                                         </span>
                                         <div style={{ flex: 1 }}>
-                                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px", flexWrap: "wrap" }}>
                                             {item.obrigatorio && (
-                                              <span style={{ color: "#f59e0b", fontSize: "0.9rem" }}>★</span>
+                                              <span style={{ 
+                                                color: "#f59e0b", 
+                                                fontSize: "1rem",
+                                                background: "#fef3c7",
+                                                padding: "2px 8px",
+                                                borderRadius: "4px",
+                                                fontWeight: "700"
+                                              }}>★ OBRIGATÓRIO</span>
                                             )}
-                                            <strong style={{ color: theme.text, fontSize: "0.9rem" }}>
+                                            <strong style={{ 
+                                              color: item.checked ? "#0a7340" : theme.text, 
+                                              fontSize: "1rem",
+                                              fontWeight: "600",
+                                              textDecoration: item.checked ? "none" : "none"
+                                            }}>
                                               {item.label}
                                             </strong>
                                             <span style={{ 
-                                              color: theme.subtext, 
+                                              color: item.checked ? "#0a7340" : theme.subtext, 
                                               fontSize: "0.75rem", 
-                                              background: theme.bg,
-                                              padding: "2px 6px",
-                                              borderRadius: "4px"
+                                              background: item.checked ? "#d4f4e5" : theme.bg,
+                                              padding: "3px 8px",
+                                              borderRadius: "4px",
+                                              fontWeight: "500",
+                                              border: `1px solid ${item.checked ? "#11A561" : theme.border}`
                                             }}>
-                                              {item.tipo}
+                                              {item.tipo === 'texto' && '📝 Texto'}
+                                              {item.tipo === 'foto' && '📷 Foto'}
+                                              {item.tipo === 'numero' && '🔢 Número'}
+                                              {item.tipo === 'data' && '📅 Data'}
+                                              {item.tipo === 'observacao' && '💬 Observação'}
+                                              {item.tipo === 'multipla_escolha' && '☑️ Múltipla Escolha'}
                                             </span>
+                                            {item.checked && (
+                                              <span style={{ 
+                                                color: "#11A561", 
+                                                fontSize: "0.8rem",
+                                                background: "#d4f4e5",
+                                                padding: "3px 10px",
+                                                borderRadius: "12px",
+                                                fontWeight: "700",
+                                                border: "1px solid #11A561"
+                                              }}>✓ CONCLUÍDO</span>
+                                            )}
                                           </div>
                                           
                                           {item.dica && (
@@ -3811,16 +3983,137 @@ export default function OrdemServico() {
                                             </p>
                                           )}
                                           
+                                          {/* Mostrar opções selecionadas para múltipla escolha */}
+                                          {item.tipo === 'multipla_escolha' && (
+                                            <div style={{ 
+                                              marginTop: "8px", 
+                                              padding: "8px", 
+                                              background: "#f0f9ff",
+                                              border: "1px solid #bae6fd",
+                                              borderRadius: "4px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 6px 0", 
+                                                color: "#0369a1", 
+                                                fontSize: "0.8rem", 
+                                                fontWeight: "600" 
+                                              }}>
+                                                ☑️ Opções Selecionadas:
+                                              </p>
+                                              {item.opçõesSelecionadas && item.opçõesSelecionadas.length > 0 ? (
+                                                <ul style={{ 
+                                                  margin: 0, 
+                                                  paddingLeft: "20px",
+                                                  color: "#0c4a6e",
+                                                  fontSize: "0.85rem"
+                                                }}>
+                                                  {item.opçõesSelecionadas.map((opcao, idx) => (
+                                                    <li key={idx}>✓ {opcao}</li>
+                                                  ))}
+                                                </ul>
+                                              ) : item.opcoes && Array.isArray(item.opcoes) ? (
+                                                <ul style={{ 
+                                                  margin: 0, 
+                                                  paddingLeft: "20px",
+                                                  color: "#0c4a6e",
+                                                  fontSize: "0.85rem"
+                                                }}>
+                                                  {item.opcoes.filter(opcao => 
+                                                    typeof opcao === 'object' ? opcao.selecionada : false
+                                                  ).map((opcao, idx) => {
+                                                    const nomeOpcao = typeof opcao === 'object' ? opcao.nome : opcao;
+                                                    return <li key={idx}>✓ {nomeOpcao}</li>;
+                                                  })}
+                                                </ul>
+                                              ) : (
+                                                <p style={{ 
+                                                  margin: 0, 
+                                                  color: "#64748b", 
+                                                  fontSize: "0.8rem",
+                                                  fontStyle: "italic"
+                                                }}>
+                                                  Nenhuma opção selecionada
+                                                </p>
+                                              )}
+                                            </div>
+                                          )}
+                                          
+                                          {/* Mostrar valor preenchido para outros tipos */}
+                                          {item.valor && item.tipo !== 'foto' && item.tipo !== 'multipla_escolha' && (
+                                            <div style={{ 
+                                              marginTop: "8px", 
+                                              padding: "10px", 
+                                              background: "#f0fdf4",
+                                              border: "2px solid #11A561",
+                                              borderRadius: "6px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 4px 0", 
+                                                color: "#0a7340", 
+                                                fontSize: "0.75rem", 
+                                                fontWeight: "700",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.5px"
+                                              }}>
+                                                📝 Resposta do Prestador:
+                                              </p>
+                                              <p style={{ 
+                                                margin: 0, 
+                                                color: "#0f172a",
+                                                fontSize: "0.95rem",
+                                                fontWeight: "600",
+                                                padding: "6px 0"
+                                              }}>
+                                                {item.valor}
+                                              </p>
+                                            </div>
+                                          )}
+                                          
                                           {item.obs && (
-                                            <p style={{ margin: "4px 0", color: theme.subtext, fontSize: "0.85rem" }}>
-                                              <strong>Observação:</strong> {item.obs}
-                                            </p>
+                                            <div style={{ 
+                                              marginTop: "8px", 
+                                              padding: "10px", 
+                                              background: "#fef9e7",
+                                              border: "1px solid #f59e0b",
+                                              borderRadius: "6px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 4px 0", 
+                                                color: "#92400e", 
+                                                fontSize: "0.75rem", 
+                                                fontWeight: "700",
+                                                textTransform: "uppercase"
+                                              }}>
+                                                💬 Observação:
+                                              </p>
+                                              <p style={{ 
+                                                margin: 0, 
+                                                color: "#44403c",
+                                                fontSize: "0.9rem",
+                                                lineHeight: "1.5"
+                                              }}>
+                                                {item.obs}
+                                              </p>
+                                            </div>
                                           )}
                                           
                                           {item.tipo === 'foto' && item.foto && (
-                                            <div style={{ marginTop: "8px" }}>
-                                              <p style={{ margin: "0 0 6px 0", color: theme.subtext, fontSize: "0.85rem" }}>
-                                                <strong>📷 Foto capturada:</strong>
+                                            <div style={{ 
+                                              marginTop: "12px",
+                                              padding: "12px",
+                                              background: "#f0fdf4",
+                                              border: "2px solid #11A561",
+                                              borderRadius: "8px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 10px 0", 
+                                                color: "#0a7340", 
+                                                fontSize: "0.85rem",
+                                                fontWeight: "700",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.5px"
+                                              }}>
+                                                📷 Foto Capturada pelo Prestador:
                                               </p>
                                               {item.foto.startsWith('file://') || item.foto.startsWith('/var/mobile') ? (
                                                 <div style={{
@@ -4016,7 +4309,7 @@ export default function OrdemServico() {
                       setAbaDetalhesOS('info');
                     }}
                     style={{
-                      background: "#10b981",
+                      background: "#11A561",
                       color: "white",
                       border: "none",
                       borderRadius: "8px",

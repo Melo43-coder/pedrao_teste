@@ -519,7 +519,7 @@ export default function Estoque() {
       color: "#64748b"
     },
     statHighlight: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     statWarning: {
       color: "#f59e0b"
@@ -575,7 +575,7 @@ export default function Estoque() {
       whiteSpace: "nowrap"
     },
     primaryButton: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     secondaryButton: {
@@ -610,7 +610,7 @@ export default function Estoque() {
       whiteSpace: "nowrap"
     },
     activeTab: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     activeTabIndicator: {
       position: "absolute",
@@ -618,7 +618,7 @@ export default function Estoque() {
       left: 0,
       width: "100%",
       height: "2px",
-      backgroundColor: "#0ea5e9"
+      backgroundColor: "#2C30D5"
     },
     tableContainer: {
       backgroundColor: "white",
@@ -730,7 +730,7 @@ export default function Estoque() {
       height: "40px",
       border: "3px solid rgba(203, 213, 225, 0.3)",
       borderRadius: "50%",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       animation: "spin 1s linear infinite",
       margin: "0 auto 16px auto"
     },
@@ -1106,7 +1106,7 @@ export default function Estoque() {
                             fontSize: '0.65rem',
                             border: 'none',
                             borderRadius: '3px',
-                            backgroundColor: '#3b82f6',
+                            backgroundColor: '#2C30D5',
                             color: 'white',
                             cursor: 'pointer',
                             fontWeight: '500',

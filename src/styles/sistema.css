@@ -480,7 +480,7 @@
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #0ea5e9;
+  border-color: #2C30D5;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
@@ -733,7 +733,7 @@ button:active,
   align-items: center;
   padding: 20px;
   border-bottom: 1px solid #e2e8f0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2C30D5 0%, #889DD3 100%);
   color: white;
 }
 
@@ -770,7 +770,7 @@ button:active,
 
 .checklist-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  border-color: #667eea;
+  border-color: #2C30D5;
 }
 
 .checklist-header {
@@ -910,7 +910,7 @@ button:active,
 .checklist-modal-header {
   padding: 20px;
   border-bottom: 1px solid #e2e8f0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2C30D5 0%, #889DD3 100%);
   color: white;
   display: flex;
   justify-content: space-between;
@@ -977,7 +977,7 @@ button:active,
 .checklist-form-group select:focus,
 .checklist-form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #2C30D5;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
@@ -1115,7 +1115,7 @@ button:active,
 }
 
 .checklist-modal-btn.primary {
-  background: #667eea;
+  background: #2C30D5;
   color: white;
 }
 
@@ -1154,7 +1154,7 @@ button:active,
 
 .seguradora-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  border-color: #10b981;
+  border-color: #11A561;
   transform: translateY(-2px);
 }
 
@@ -1302,7 +1302,7 @@ button:active,
 .seguradora-modal-header {
   padding: 20px;
   border-bottom: 1px solid #e2e8f0;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #11A561 0%, #0d8550 100%);
   color: white;
   display: flex;
   justify-content: space-between;
@@ -1369,7 +1369,7 @@ button:active,
 .seguradora-form-group select:focus,
 .seguradora-form-group textarea:focus {
   outline: none;
-  border-color: #10b981;
+  border-color: #11A561;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
@@ -1399,12 +1399,12 @@ button:active,
 }
 
 .seguradora-modal-btn.primary {
-  background: #10b981;
+  background: #11A561;
   color: white;
 }
 
 .seguradora-modal-btn.primary:hover {
-  background: #059669;
+  background: #0d8550;
 }
 
 .seguradora-modal-btn.secondary {
@@ -1427,7 +1427,7 @@ button:active,
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2C30D5 0%, #889DD3 100%);
   color: white;
   border: none;
   font-size: 24px;

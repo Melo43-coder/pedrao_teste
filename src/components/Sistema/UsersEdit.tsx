@@ -319,7 +319,7 @@ const styles: Record<string, React.CSSProperties> = {
   inputSmall: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, minWidth: 120 },
   select: { padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 },
   selectSmall: { padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 },
-  primaryBtn: { background: '#0ea5e9', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' },
+  primaryBtn: { background: '#2C30D5', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer' },
   secondaryBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '10px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer' },
   smallBtn: { background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', marginBottom: 4 },
   secondarySmall: { background: '#fff' },

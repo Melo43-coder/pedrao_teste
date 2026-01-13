@@ -57,7 +57,7 @@ export default function SistemaLayout({ children }) {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
               display: isMobile ? 'flex' : 'none',
-              background: '#0ea5e9',
+              background: '#32DAF3',
               color: 'white',
               border: 'none',
               width: '40px',
@@ -80,7 +80,7 @@ export default function SistemaLayout({ children }) {
               marginLeft: isMobile ? '12px' : 0,
             }}
           >
-            SmartOps
+            Zillo Assist
           </h1>
         </div>
 

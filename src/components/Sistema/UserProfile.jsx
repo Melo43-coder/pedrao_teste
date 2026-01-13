@@ -460,8 +460,8 @@ const UserProfile = () => {
             {saveStatus === 'success' && (
               <div className="save-success" style={{
                 padding: '15px',
-                backgroundColor: '#d4edda',
-                color: '#155724',
+                backgroundColor: '#d4f4e5',
+                color: '#11A561',
                 borderRadius: '8px',
                 marginTop: '15px',
                 border: '1px solid #c3e6cb'
@@ -656,7 +656,7 @@ const UserProfile = () => {
                     padding: '10px 20px',
                     borderRadius: '8px',
                     border: 'none',
-                    backgroundColor: '#007bff',
+                    backgroundColor: '#2C30D5',
                     color: 'white',
                     cursor: 'pointer',
                     fontSize: '14px',

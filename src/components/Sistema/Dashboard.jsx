@@ -51,7 +51,7 @@ const Breadcrumb = () => {
   if (activePath === "perfil") {
     return (
       <div className="breadcrumb">
-        <span className="breadcrumb-home">SmartOps</span>
+        <span className="breadcrumb-home">Zillo Assist</span>
         <span className="breadcrumb-separator">/</span>
         <span className="breadcrumb-current">Meu Perfil</span>
       </div>
@@ -62,7 +62,7 @@ const Breadcrumb = () => {
 
   return (
     <div className="breadcrumb">
-      <span className="breadcrumb-home">SmartOps</span>
+      <span className="breadcrumb-home">Zillo Assist</span>
       <span className="breadcrumb-separator">/</span>
       {currentMenu && (
         <span className="breadcrumb-current">
@@ -98,7 +98,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const userName = localStorage.getItem("userName") || "Usuário";
-  const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
+  const userEmail = localStorage.getItem("userEmail") || "usuario@zilloassist.com";
   const userInitial = userName.charAt(0).toUpperCase();
   const userRole = localStorage.getItem('userRole') || 'user';
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
@@ -121,8 +121,8 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
     <aside className={`sidebar ${isMobileMenuOpen ? "open" : ""}`}>
       <div className="logo-container">
         <h1 className="logo">
-          <span className="logo-icon">S</span>
-          SmartOps
+          <span className="logo-icon">Z</span>
+          Zillo Assist
         </h1>
       </div>
       
@@ -224,9 +224,12 @@ const Header = ({ toggleMobileMenu }) => {
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [prestadorNotificationsOpen, setPrestadorNotificationsOpen] = useState(false);
   const [toastNotification, setToastNotification] = useState(null);
   const [notificacoes, setNotificacoes] = useState([]);
   const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
+  const [notificacoesPrestador, setNotificacoesPrestador] = useState([]);
+  const [notificacoesPrestadorNaoLidas, setNotificacoesPrestadorNaoLidas] = useState(0);
   
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
   const userName = localStorage.getItem('userName') || 'Usuário';
@@ -365,6 +368,106 @@ const Header = ({ toggleMobileMenu }) => {
     
     return () => clearInterval(interval);
   }, [companyCnpj, userName]);
+
+  // 🔥 Carregar notificações de prestadores em tempo real
+  useEffect(() => {
+    if (!companyCnpj) return;
+
+    const carregarNotificacoesPrestador = async () => {
+      try {
+        const firebase = await import('../../services/firebase');
+        const notifs = [];
+        
+        // Buscar ordens de serviço com prestadores
+        const ordens = await firebase.listServiceOrders(companyCnpj);
+        const ordensAtivas = ordens?.filter(os => 
+          os.status === 'Em Andamento' || os.status === 'Atribuída'
+        ) || [];
+
+        ordensAtivas.forEach(os => {
+          if (os.prestador) {
+            // Verificar se prestador entrou no raio
+            if (os.prestadorNoRaio && !os.notificadoEntradaRaio) {
+              notifs.push({
+                id: `prestador-raio-${os.id}`,
+                tipo: 'raio',
+                titulo: '📍 Prestador no raio do serviço',
+                mensagem: `${os.prestador} chegou próximo ao local da OS #${os.numero}`,
+                timestamp: new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+
+            // Verificar se prestador chegou no local
+            if (os.prestadorNoLocal && !os.notificadoChegada) {
+              notifs.push({
+                id: `prestador-chegada-${os.id}`,
+                tipo: 'chegada',
+                titulo: '✅ Prestador chegou no local',
+                mensagem: `${os.prestador} chegou no endereço da OS #${os.numero}`,
+                timestamp: new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+
+            // Verificar se prestador iniciou o serviço
+            if (os.checklistPrestador?.etapa1?.iniciado && !os.notificadoInicio) {
+              notifs.push({
+                id: `prestador-inicio-${os.id}`,
+                tipo: 'inicio',
+                titulo: '🛠️ Serviço iniciado',
+                mensagem: `${os.prestador} iniciou o atendimento da OS #${os.numero}`,
+                timestamp: os.checklistPrestador.etapa1.dataHoraInicio || new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+
+            // Verificar se prestador finalizou o serviço
+            if (os.checklistPrestador?.etapa3?.finalizado && !os.notificadoFinalizacao) {
+              notifs.push({
+                id: `prestador-finalizacao-${os.id}`,
+                tipo: 'finalizacao',
+                titulo: '🎉 Serviço finalizado',
+                mensagem: `${os.prestador} concluiu o atendimento da OS #${os.numero}`,
+                timestamp: os.checklistPrestador.etapa3.dataHoraFinalizacao || new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+          }
+        });
+
+        // Ordenar por timestamp (mais recente primeiro)
+        notifs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        setNotificacoesPrestador(notifs);
+        setNotificacoesPrestadorNaoLidas(notifs.filter(n => !n.lida).length);
+
+        // Mostrar popup para novas notificações de prestador
+        notifs.forEach(notif => {
+          if (!notif.lida) {
+            showNotification(notif.titulo, notif.mensagem, 'info');
+          }
+        });
+      } catch (error) {
+        console.error('Erro ao carregar notificações de prestador:', error);
+      }
+    };
+
+    carregarNotificacoesPrestador();
+    
+    // Atualizar a cada 15 segundos (mais frequente para prestadores)
+    const interval = setInterval(carregarNotificacoesPrestador, 15000);
+    
+    return () => clearInterval(interval);
+  }, [companyCnpj]);
   
   // Marcar notificação como lida
   const marcarComoLida = (notifId) => {
@@ -374,16 +477,39 @@ const Header = ({ toggleMobileMenu }) => {
     setNotificacoesNaoLidas(prev => Math.max(0, prev - 1));
   };
 
+  // Marcar notificação de prestador como lida
+  const marcarPrestadorComoLida = (notifId) => {
+    setNotificacoesPrestador(prev => prev.map(n => 
+      n.id === notifId ? { ...n, lida: true } : n
+    ));
+    setNotificacoesPrestadorNaoLidas(prev => Math.max(0, prev - 1));
+  };
+
   // Marcar todas como lidas
   const marcarTodasComoLidas = () => {
     setNotificacoes(prev => prev.map(n => ({ ...n, lida: true })));
     setNotificacoesNaoLidas(0);
   };
 
+  // Marcar todas notificações de prestador como lidas
+  const marcarTodasPrestadorComoLidas = () => {
+    setNotificacoesPrestador(prev => prev.map(n => ({ ...n, lida: true })));
+    setNotificacoesPrestadorNaoLidas(0);
+  };
+
   // Navegar para notificação
   const abrirNotificacao = (notif) => {
     marcarComoLida(notif.id);
     setNotificationsOpen(false);
+    if (notif.link) {
+      navigate(notif.link);
+    }
+  };
+
+  // Navegar para notificação de prestador
+  const abrirNotificacaoPrestador = (notif) => {
+    marcarPrestadorComoLida(notif.id);
+    setPrestadorNotificationsOpen(false);
     if (notif.link) {
       navigate(notif.link);
     }
@@ -447,7 +573,7 @@ const Header = ({ toggleMobileMenu }) => {
             gap: '12px',
             minWidth: '350px',
             backgroundColor: toastNotification.type === 'critical' ? '#ef4444' : 
-                            toastNotification.type === 'warning' ? '#f59e0b' : '#10b981',
+                            toastNotification.type === 'warning' ? '#f59e0b' : '#11A561',
             color: 'white',
             fontWeight: '600',
             fontSize: '14px',
@@ -541,7 +667,94 @@ const Header = ({ toggleMobileMenu }) => {
                     style={{ 
                       background: 'none', 
                       border: 'none', 
-                      color: '#667eea', 
+                      color: '#2C30D5', 
+                      cursor: 'pointer',
+                      padding: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Limpar todas
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Botão P de Prestador */}
+        <div className="notification-container">
+          <button 
+            className="action-button prestador-button" 
+            aria-label="Notificações de Prestadores"
+            onClick={() => setPrestadorNotificationsOpen(!prestadorNotificationsOpen)}
+            style={{
+              background: 'linear-gradient(135deg, #11A561 0%, #0d8f51 100%)',
+              fontWeight: '700',
+              fontSize: '16px',
+              letterSpacing: '0.5px'
+            }}
+          >
+            P
+            {notificacoesPrestadorNaoLidas > 0 && (
+              <span className="notification-badge">{notificacoesPrestadorNaoLidas}</span>
+            )}
+          </button>
+          
+          {prestadorNotificationsOpen && (
+            <div className="notifications-dropdown">
+              <div className="dropdown-arrow"></div>
+              <div className="notifications-header">
+                <h3>🚀 Prestadores</h3>
+                {notificacoesPrestadorNaoLidas > 0 && (
+                  <button className="mark-all-read" onClick={marcarTodasPrestadorComoLidas}>
+                    Marcar todas como lidas
+                  </button>
+                )}
+              </div>
+              <ul className="notifications-list">
+                {notificacoesPrestador.length === 0 ? (
+                  <li className="notification-item" style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '8px' }}>🚀</div>
+                    <p>Nenhuma atividade de prestador</p>
+                  </li>
+                ) : (
+                  notificacoesPrestador.map(notif => (
+                    <li 
+                      key={notif.id} 
+                      className={`notification-item ${!notif.lida ? 'unread' : ''}`}
+                      onClick={() => abrirNotificacaoPrestador(notif)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="notification-icon">
+                        {notif.tipo === 'raio' && '📍'}
+                        {notif.tipo === 'chegada' && '✅'}
+                        {notif.tipo === 'inicio' && '🛠️'}
+                        {notif.tipo === 'finalizacao' && '🎉'}
+                      </div>
+                      <div className="notification-content">
+                        <p className="notification-text" style={{ fontWeight: !notif.lida ? '600' : '400' }}>
+                          {notif.mensagem}
+                        </p>
+                        <p className="notification-time">
+                          {new Date(notif.timestamp).toLocaleTimeString('pt-BR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+              {notificacoesPrestador.length > 0 && (
+                <div className="notifications-footer">
+                  <button 
+                    onClick={() => { setPrestadorNotificationsOpen(false); marcarTodasPrestadorComoLidas(); }}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#11A561', 
                       cursor: 'pointer',
                       padding: '8px',
                       fontSize: '14px',

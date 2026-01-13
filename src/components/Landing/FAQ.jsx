@@ -2,8 +2,8 @@ import React, { useState } from "react";
 
 const FAQS = [
   {
-    pergunta: "Preciso instalar algo para usar o Assistus?",
-    resposta: "Não! O Assistus é 100% online. Basta acessar pelo navegador."
+    pergunta: "Preciso instalar algo para usar o Zillo Assist?",
+    resposta: "Não! O Zillo Assist é 100% online. Basta acessar pelo navegador."
   },
   {
     pergunta: "Posso mudar de plano depois?",

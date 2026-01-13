@@ -1177,7 +1177,7 @@ Formato:
       color: "#64748b"
     },
     statHighlight: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     statWarning: {
       color: "#f59e0b"
@@ -1186,7 +1186,7 @@ Formato:
       color: "#ef4444"
     },
     statSuccess: {
-      color: "#10b981"
+      color: "#11A561"
     },
     tabContainer: {
       marginBottom: "24px",
@@ -1205,7 +1205,7 @@ Formato:
       backgroundColor: "transparent"
     },
     activeTab: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     activeTabIndicator: {
       position: "absolute",
@@ -1213,7 +1213,7 @@ Formato:
       left: 0,
       width: "100%",
       height: "2px",
-      backgroundColor: "#0ea5e9"
+      backgroundColor: "#2C30D5"
     },
     contentContainer: {
       display: "grid",
@@ -1263,19 +1263,19 @@ Formato:
       backgroundColor: "#f8fafc",
       borderRadius: "12px",
       padding: "16px",
-      borderLeft: "4px solid #0ea5e9"
+      borderLeft: "4px solid #2C30D5"
     },
     insightTendencia: {
-      borderLeftColor: "#0ea5e9"
+      borderLeftColor: "#2C30D5"
     },
     insightOtimizacao: {
-      borderLeftColor: "#10b981"
+      borderLeftColor: "#11A561"
     },
     insightAlerta: {
       borderLeftColor: "#ef4444"
     },
     insightOportunidade: {
-      borderLeftColor: "#8b5cf6"
+      borderLeftColor: "#889DD3"
     },
     insightEficiencia: {
       borderLeftColor: "#f59e0b"
@@ -1291,15 +1291,15 @@ Formato:
       padding: "2px 8px",
       borderRadius: "9999px",
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     insightTipoTendencia: {
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     insightTipoOtimizacao: {
       backgroundColor: "#dcfce7",
-      color: "#10b981"
+      color: "#11A561"
     },
     insightTipoAlerta: {
       backgroundColor: "#fee2e2",
@@ -1307,7 +1307,7 @@ Formato:
     },
     insightTipoOportunidade: {
       backgroundColor: "#f3e8ff",
-      color: "#8b5cf6"
+      color: "#889DD3"
     },
     insightTipoEficiencia: {
       backgroundColor: "#fef3c7",
@@ -1376,7 +1376,7 @@ Formato:
       padding: "2px 8px",
       borderRadius: "9999px",
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     previsaoGrid: {
       display: "grid",
@@ -1406,7 +1406,7 @@ Formato:
       marginTop: "4px"
     },
     previsaoCrescimentoPositivo: {
-      color: "#10b981"
+      color: "#11A561"
     },
     previsaoCrescimentoNegativo: {
       color: "#ef4444"
@@ -1434,7 +1434,7 @@ Formato:
       justifyContent: "center",
       fontSize: "1.5rem",
       fontWeight: "600",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     prestadorInfo: {
       flex: 1
@@ -1476,7 +1476,7 @@ Formato:
     },
     prestadorDisponivel: {
       backgroundColor: "#dcfce7",
-      color: "#10b981"
+      color: "#11A561"
     },
     prestadorOcupado: {
       backgroundColor: "#fef3c7",
@@ -1495,7 +1495,7 @@ Formato:
       backgroundColor: "#f8fafc",
       borderRadius: "12px",
       padding: "16px",
-      borderLeft: "4px solid #0ea5e9"
+      borderLeft: "4px solid #2C30D5"
     },
     servicoCritico: {
       borderLeftColor: "#ef4444"
@@ -1504,10 +1504,10 @@ Formato:
       borderLeftColor: "#f59e0b"
     },
     servicoMedio: {
-      borderLeftColor: "#0ea5e9"
+      borderLeftColor: "#2C30D5"
     },
     servicoBaixo: {
-      borderLeftColor: "#10b981"
+      borderLeftColor: "#11A561"
     },
     servicoHeader: {
       display: "flex",
@@ -1535,11 +1535,11 @@ Formato:
     },
     servicoPrioridadeMedia: {
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     servicoPrioridadeBaixa: {
       backgroundColor: "#dcfce7",
-      color: "#10b981"
+      color: "#11A561"
     },
     servicoTitulo: {
       fontSize: "1rem",
@@ -1603,7 +1603,7 @@ Formato:
     },
     regraAtiva: {
       backgroundColor: "#dcfce7",
-      color: "#10b981"
+      color: "#11A561"
     },
     regraInativa: {
       backgroundColor: "#fee2e2",
@@ -1633,7 +1633,7 @@ Formato:
       padding: "2px 8px",
       borderRadius: "9999px",
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     regraFooter: {
       display: "flex",
@@ -1658,15 +1658,15 @@ Formato:
       gap: "8px"
     },
     primaryButton: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     secondaryButton: {
-      backgroundColor: "#8b5cf6",
+      backgroundColor: "#889DD3",
       color: "white"
     },
     successButton: {
-      backgroundColor: "#10b981",
+      backgroundColor: "#11A561",
       color: "white"
     },
     warningButton: {
@@ -1704,7 +1704,7 @@ Formato:
       height: "40px",
       border: "3px solid rgba(203, 213, 225, 0.3)",
       borderRadius: "50%",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       animation: "spin 1s linear infinite",
       margin: "0 auto 16px auto"
     },
@@ -1820,15 +1820,15 @@ Formato:
       borderRadius: "8px",
       marginBottom: "16px",
       backgroundColor: "#f8fafc",
-      borderLeft: "4px solid #0ea5e9"
+      borderLeft: "4px solid #2C30D5"
     },
     alertBoxInfo: {
       backgroundColor: "#e0f2fe",
-      borderLeftColor: "#0ea5e9"
+      borderLeftColor: "#2C30D5"
     },
     alertBoxSuccess: {
       backgroundColor: "#dcfce7",
-      borderLeftColor: "#10b981"
+      borderLeftColor: "#11A561"
     },
     alertBoxWarning: {
       backgroundColor: "#fef3c7",
@@ -1860,7 +1860,7 @@ Formato:
     servicoConcluidoTitulo: {
       fontSize: "1.25rem",
       fontWeight: "700",
-      color: "#10b981",
+      color: "#11A561",
       marginBottom: "8px"
     },
     servicoConcluidoSubtitulo: {
@@ -1892,7 +1892,7 @@ Formato:
       backgroundColor: "#f0f9ff",
       borderRadius: "12px",
       padding: "16px",
-      borderLeft: "4px solid #0ea5e9"
+      borderLeft: "4px solid #2C30D5"
     },
     servicoProximoHeader: {
       display: "flex",
@@ -1903,7 +1903,7 @@ Formato:
     servicoProximoTitulo: {
       fontSize: "1rem",
       fontWeight: "600",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     servicoProximoMatch: {
       fontSize: "0.75rem",
@@ -1911,7 +1911,7 @@ Formato:
       padding: "4px 8px",
       borderRadius: "9999px",
       backgroundColor: "#dcfce7",
-      color: "#10b981"
+      color: "#11A561"
     },
     servicoProximoAcoes: {
       display: "flex",
@@ -2158,7 +2158,7 @@ Formato:
           <div>
             {/* IA Analisando Fluxo */}
             <motion.div 
-              style={{...styles.card, backgroundColor: "#f0fdf4", borderLeft: "4px solid #10b981"}}
+              style={{...styles.card, backgroundColor: "#f0fdf4", borderLeft: "4px solid #11A561"}}
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
@@ -2275,7 +2275,7 @@ Formato:
           <div>
             {/* Equipe com Status de IA */}
             <motion.div 
-              style={{...styles.card, backgroundColor: "#f3e8ff", borderLeft: "4px solid #8b5cf6"}}
+              style={{...styles.card, backgroundColor: "#f3e8ff", borderLeft: "4px solid #889DD3"}}
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
@@ -2521,7 +2521,7 @@ Formato:
                   ✅ Otimiza FLUXO DE TRABALHO em tempo real<br/>
                   ✅ Responde perguntas sobre sua operação<br/>
                   <br/>
-                  <span style={{fontWeight: '700', color: '#8b5cf6'}}>🚀 Powered by Groq API + Llama 3.3 70B</span>
+                  <span style={{fontWeight: '700', color: '#889DD3'}}>🚀 Powered by Groq API + Llama 3.3 70B</span>
                 </div>
                 <div style={{ fontSize: '12px', marginTop: '12px', color: '#94a3b8' }}>
                   Digite uma pergunta ou solicitação abaixo para começar
@@ -2546,7 +2546,7 @@ Formato:
                     width: '32px',
                     height: '32px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                    background: 'linear-gradient(135deg, #889DD3 0%, #6366f1 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2560,7 +2560,7 @@ Formato:
                 )}
                 <div style={{
                   maxWidth: '70%',
-                  backgroundColor: msg.tipo === 'usuario' ? '#3b82f6' : '#ffffff',
+                  backgroundColor: msg.tipo === 'usuario' ? '#2C30D5' : '#ffffff',
                   color: msg.tipo === 'usuario' ? 'white' : '#0f172a',
                   padding: '12px 16px',
                   borderRadius: '12px',
@@ -2588,7 +2588,7 @@ Formato:
                     width: '32px',
                     height: '32px',
                     borderRadius: '50%',
-                    backgroundColor: '#3b82f6',
+                    backgroundColor: '#2C30D5',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2606,13 +2606,13 @@ Formato:
                 display: 'flex',
                 gap: '8px',
                 alignItems: 'center',
-                color: '#8b5cf6'
+                color: '#889DD3'
               }}>
                 <div style={{
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                  background: 'linear-gradient(135deg, #889DD3 0%, #6366f1 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2726,7 +2726,7 @@ Formato:
                 style={{
                   padding: '10px 16px',
                   background: (iaInput.trim() && !iaLoading && cnpj) 
-                    ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)' 
+                    ? 'linear-gradient(135deg, #889DD3 0%, #6366f1 100%)' 
                     : '#cbd5e1',
                   color: 'white',
                   border: 'none',

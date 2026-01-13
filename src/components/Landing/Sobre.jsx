@@ -12,7 +12,7 @@ export default function Sobre() {
           textAlign: "center",
           marginBottom: 22,
           fontWeight: 700
-        }}>Sobre o Assistus</h2>
+        }}>Sobre o Zillo Assist</h2>
         <p style={{
           color: "var(--text-primary)",
           fontSize: "1.17rem",
@@ -79,7 +79,7 @@ export default function Sobre() {
           textAlign: "center",
           fontSize: "1.03rem"
         }}>
-          Assistus: do básico ao avançado, para quem quer crescer com tecnologia e simplicidade.<br />
+          Zillo Assist: do básico ao avançado, para quem quer crescer com tecnologia e simplicidade.<br />
           Um sistema, todas as respostas.
         </p>
       </section>

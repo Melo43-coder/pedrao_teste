@@ -21,7 +21,7 @@ const MODULOS = [
           marginBottom: 38,
           letterSpacing: "0.2px"
         }}>
-          Principais módulos do Assistus
+          Principais módulos do Zillo Assist
         </h2>
         <div style={{
           display: "grid",
