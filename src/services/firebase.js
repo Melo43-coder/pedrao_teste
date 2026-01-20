@@ -8,6 +8,13 @@ function normalizeCnpj(cnpj) {
   return normalized.length >= 8 ? normalized : null; // CNPJ deve ter no mínimo 8 dígitos
 }
 
+// Verificar se db está inicializado
+function checkDb() {
+  if (!db) {
+    throw new Error('Firebase não inicializado. Por favor, aguarde.');
+  }
+}
+
 // Construct a synthetic email for Firebase Auth using username + cnpj
 function makeEmail(cnpj, usuario) {
   const c = normalizeCnpj(cnpj);
@@ -16,6 +23,7 @@ function makeEmail(cnpj, usuario) {
 }
 
 export async function identifyCnpj(cnpj) {
+  checkDb();
   const id = normalizeCnpj(cnpj);
   if (!id) return { exists: false };
   const ref = doc(db, 'companies', id);
@@ -25,6 +33,7 @@ export async function identifyCnpj(cnpj) {
 }
 
 export async function checkUser(cnpj, usuario) {
+  checkDb();
   const companyId = normalizeCnpj(cnpj);
   if (!companyId) return { exists: false };
   const usersRef = collection(db, 'companies', companyId, 'users');
@@ -49,38 +58,42 @@ export async function login({ cnpj, usuario, senha }) {
     const user = snap.empty ? null : snap.docs[0].data();
     return { token, userName: (user && user.displayName) || usuario, company: { cnpj: companyId }, user };
   } catch (err) {
-    // ✨ FALLBACK: Tentar autenticar pelo Firestore (qualquer erro do Firebase Auth)
-    console.warn('⚠️ Firebase Auth falhou, tentando Firestore fallback:', err.code);
+    console.error('Erro de autenticação:', err.code);
     
-    try {
+    // 🔄 FALLBACK: Tentar autenticar via Firestore (usuários legados)
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      console.warn('⚠️ Usando fallback Firestore (não recomendado em produção)');
       const companyId = normalizeCnpj(cnpj);
-      if (!companyId) throw new Error('CNPJ inválido: informe o CNPJ da empresa antes de efetuar o login.');
+      if (!companyId) throw new Error('CNPJ inválido.');
       
       const usersRef = collection(db, 'companies', companyId, 'users');
       const q = query(usersRef, where('username', '==', usuario));
       const snap = await getDocs(q);
       
-      if (snap.empty) throw new Error('Usuário não encontrado');
-      
-      const docData = snap.docs[0].data();
-      
-      // ⚠️ Comparar senha plaintext do Firestore (apenas desenvolvimento)
-      if (docData.password && docData.password === senha) {
-        const fakeToken = 'firestore-token-' + (docData.uid || snap.docs[0].id);
-        console.log('✅ Login via Firestore fallback bem-sucedido');
-        return { 
-          token: fakeToken, 
-          userName: docData.displayName || usuario, 
-          company: { cnpj: companyId },
-          user: docData
-        };
+      if (snap.empty) {
+        throw new Error('Usuário não encontrado.');
       }
       
-      throw new Error('Senha inválida');
-    } catch (fallbackErr) {
-      // Se fallback também falhar, lançar erro original
-      throw fallbackErr;
+      const userDoc = snap.docs[0];
+      const user = userDoc.data();
+      
+      // Verificar senha (comparação simples - considere usar bcrypt em produção)
+      if (user.password !== senha) {
+        throw new Error('Senha incorreta.');
+      }
+      
+      // Gerar token fictício (em produção, use JWT ou Auth Token real)
+      const token = `firestore-token-${userDoc.id}-${Date.now()}`;
+      return { token, userName: user.displayName || usuario, company: { cnpj: companyId }, user, fallback: true };
     }
+    
+    // Outros erros
+    if (err.code === 'auth/too-many-requests') {
+      throw new Error('Muitas tentativas de login. Aguarde alguns minutos.');
+    } else if (err.code === 'auth/network-request-failed') {
+      throw new Error('Erro de conexão. Verifique sua internet.');
+    }
+    throw err;
   }
 }
 
@@ -112,22 +125,9 @@ export async function registerUser({ cnpj, usuario, senha, displayName, role = '
       const companyId = normalizeCnpj(cnpj);
       if (!companyId) throw new Error('CNPJ inválido: informe o CNPJ da empresa ao cadastrar o usuário (fallback).');
       const usersRef = collection(db, 'companies', companyId, 'users');
-      const docRef = await addDoc(usersRef, {
-        // note: no uid from Auth available in fallback
-        username: usuario,
-        displayName: displayName || usuario,
-        role,
-        active: !!active,
-        // store plaintext password only as a dev fallback — DO NOT use in production
-        password: senha,
-        authProvider: 'firestore',
-        email: email || authEmail || null,
-        phone: phone || null,
-        address: address || null,
-        addressNumber: addressNumber || null,
-        createdAt: new Date().toISOString()
-      });
-      return { uid: docRef.id, fallback: true, message: 'Registrado apenas no Firestore (Auth Email/Password desabilitado).' };
+      // SECURITY: Não armazenar senha em texto plano - desabilitado
+      console.error('ERRO DE SEGURANÇA: Email/Password Auth está desabilitado. Habilite no Firebase Console.');
+      throw new Error('Autenticação por Email/Password não está configurada. Entre em contato com o administrador.');
     }
     // Re-throw other errors
     throw err;
@@ -145,23 +145,68 @@ export async function createCompany(cnpj, data = {}) {
   return { exists: true, company: newSnap.data() };
 }
 
-export async function updateUser(cnpj, userId, updates = {}) {
+export async function updateUser(cnpj, userName, updates = {}) {
   const companyId = normalizeCnpj(cnpj);
   if (!companyId) throw new Error('CNPJ inválido');
-  if (!userId) throw new Error('userId requerido');
-  const userRef = doc(db, 'companies', companyId, 'users', userId);
+  if (!userName) throw new Error('userName requerido');
+  
+  console.log('🔍 updateUser - Buscando usuário:', userName);
+  console.log('📍 CNPJ:', companyId);
+  
+  // Buscar o usuário pelo username para obter o ID correto do documento
+  const usersRef = collection(db, 'companies', companyId, 'users');
+  const q = query(usersRef, where('username', '==', userName));
+  const snap = await getDocs(q);
+  
+  console.log('📊 Resultados encontrados:', snap.size);
+  
+  if (snap.empty) {
+    // Listar todos os usuários para debug
+    console.log('⚠️ Usuário não encontrado. Listando todos os usuários:');
+    const allUsersSnap = await getDocs(usersRef);
+    allUsersSnap.forEach(doc => {
+      console.log('  - ID:', doc.id, '| username:', doc.data().username);
+    });
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userDoc = snap.docs[0];
+  console.log('✅ Usuário encontrado - ID do documento:', userDoc.id);
+  
+  const userRef = doc(db, 'companies', companyId, 'users', userDoc.id);
+  
   await updateDoc(userRef, updates);
-  const snap = await getDoc(userRef);
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  const updatedSnap = await getDoc(userRef);
+  return updatedSnap.exists() ? { id: updatedSnap.id, ...updatedSnap.data() } : null;
 }
 
-export async function deleteUser(cnpj, userId) {
+export async function deleteUser(cnpj, userIdOrUsername) {
   const companyId = normalizeCnpj(cnpj);
   if (!companyId) throw new Error('CNPJ inválido');
-  if (!userId) throw new Error('userId requerido');
-  const userRef = doc(db, 'companies', companyId, 'users', userId);
-  await deleteDoc(userRef);
-  return { id: userId, deleted: true };
+  if (!userIdOrUsername) throw new Error('userIdOrUsername requerido');
+  
+  // Tentar primeiro como ID direto (se não tiver caracteres especiais)
+  if (!userIdOrUsername.includes('/') && !userIdOrUsername.includes('.')) {
+    const userRef = doc(db, 'companies', companyId, 'users', userIdOrUsername);
+    const snap = await getDoc(userRef);
+    if (snap.exists()) {
+      await deleteDoc(userRef);
+      return { id: userIdOrUsername, deleted: true };
+    }
+  }
+  
+  // Caso contrário, buscar pelo username
+  const usersRef = collection(db, 'companies', companyId, 'users');
+  const q = query(usersRef, where('username', '==', userIdOrUsername));
+  const snap = await getDocs(q);
+  
+  if (snap.empty) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userDoc = snap.docs[0];
+  await deleteDoc(userDoc.ref);
+  return { id: userDoc.id, deleted: true };
 }
 
 export async function recoverPassword(emailOrUsername, cnpj) {
@@ -200,11 +245,20 @@ export async function createServiceOrder(cnpj, orderData) {
 }
 
 export async function listServiceOrders(cnpj) {
+  checkDb();
   const companyId = normalizeCnpj(cnpj);
   if (!companyId) throw new Error('CNPJ inválido');
   const ordersRef = collection(db, 'companies', companyId, 'serviceOrders');
   const snap = await getDocs(ordersRef);
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snap.docs.map(doc => {
+    const data = doc.data();
+    return { 
+      id: doc.id, 
+      ...data,
+      // Garantir que responsavel sempre tenha um valor
+      responsavel: data.responsavel || data.prestadorNome || null
+    };
+  });
 }
 
 export async function updateServiceOrder(cnpj, orderId, updateData) {

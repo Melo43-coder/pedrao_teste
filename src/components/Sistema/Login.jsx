@@ -228,6 +228,9 @@ export default function Login({ recoveryMode = false }) {
           }
 
           localStorage.setItem("authToken", res.token);
+          // Definir expiração do token (24 horas a partir de agora)
+          const expiry = Date.now() + (24 * 60 * 60 * 1000);
+          localStorage.setItem("tokenExpiry", expiry.toString());
           if (res.userName) localStorage.setItem("userName", res.userName);
           // save a sensible companyCnpj normalized so other parts of the app can read it
           if (res.company && res.company.cnpj) {
@@ -246,25 +249,18 @@ export default function Login({ recoveryMode = false }) {
             localStorage.setItem("userEmail", `${usuario}@${normalizeCnpj(cnpj)}.local`);
           }
 
-          // Attempt to fetch the user profile (role and displayName) so the dashboard shows correct name
-          const profileCall = api.checkUser(normalized, usuario);
-          Promise.resolve(profileCall)
-            .then(profileRes => {
-              const role = (profileRes && profileRes.user && profileRes.user.role) ? profileRes.user.role : 'user';
-              const displayName = (profileRes && profileRes.user && profileRes.user.displayName) ? profileRes.user.displayName : usuario;
-              localStorage.setItem('userRole', role);
-              // Override userName with the correct displayName from profile
-              localStorage.setItem('userName', displayName);
-            })
-            .catch(() => {
-              // If profile fetch fails, fallback to demo account roles
-              const demoRole = usuario === 'admin' ? 'admin' : (usuario === 'gerente' ? 'gerente' : 'user');
-              localStorage.setItem('userRole', demoRole);
-            })
-            .finally(() => {
-              setLoginStage(3);
-              setTimeout(() => navigate("/dashboard"), 800);
-            });
+          // Salvar role do usuário (usar dados do Firebase se disponível)
+          if (res.user && res.user.role) {
+            localStorage.setItem('userRole', res.user.role);
+          } else {
+            // Fallback baseado no username
+            const demoRole = usuario === 'admin' ? 'admin' : (usuario === 'gerente' ? 'gerente' : 'user');
+            localStorage.setItem('userRole', demoRole);
+          }
+
+          // ✅ Redirecionar para o dashboard
+          setLoginStage(3);
+          setTimeout(() => navigate("/dashboard"), 800);
         } else {
           setErro((res && res.message) || "Credenciais inválidas. Tente novamente.");
         }
@@ -288,6 +284,9 @@ export default function Login({ recoveryMode = false }) {
           }
 
           localStorage.setItem("authToken", "token-jwt-ficticio-" + Date.now());
+          // Definir expiração do token (24 horas a partir de agora)
+          const expiry = Date.now() + (24 * 60 * 60 * 1000);
+          localStorage.setItem("tokenExpiry", expiry.toString());
           localStorage.setItem("userName", usuarioEncontrado.nome);
           localStorage.setItem("companyCnpj", normalized);
           localStorage.setItem("userEmail", `${usuario}@${normalized}.local`);
@@ -440,7 +439,7 @@ export default function Login({ recoveryMode = false }) {
           
           <div className="card-brand">
             <div className="brand-logo">
-              <span className="logo-text">Assistus</span>
+              <span className="logo-text">Zillo Assist</span>
             </div>
           </div>
         </motion.div>
@@ -477,7 +476,7 @@ export default function Login({ recoveryMode = false }) {
             </div>
             <h2>
               <span>Acesse o </span>
-              <span className="highlight">Assistus</span>
+              <span className="highlight">Zillo Assist</span>
             </h2>
           </motion.div>
           
@@ -850,13 +849,13 @@ function getStyles() {
       width: 64px;
       height: 64px;
       border-radius: 20px;
-      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      background: linear-gradient(135deg, #2C30D5 0%, #889DD3 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       color: #ffffff;
       box-shadow: 
-        0 8px 24px rgba(59, 130, 246, 0.4),
+        0 8px 24px rgba(44, 48, 213, 0.4),
         0 0 0 1px rgba(255, 255, 255, 0.1);
       animation: float 3s ease-in-out infinite;
     }
@@ -884,7 +883,7 @@ function getStyles() {
     }
     
     .highlight {
-      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      background: linear-gradient(135deg, #2C30D5 0%, #889DD3 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -934,7 +933,7 @@ function getStyles() {
       left: -2px;
       right: -2px;
       bottom: -2px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+      background: linear-gradient(135deg, #2C30D5, #889DD3, #32DAF3);
       border-radius: 16px;
       opacity: 0;
       transition: opacity 0.4s ease;
@@ -978,16 +977,16 @@ function getStyles() {
     
     .input-icon {
       margin-left: 20px;
-      color: #3b82f6;
+      color: #2C30D5;
       opacity: 0.7;
       transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.3));
+      filter: drop-shadow(0 0 4px rgba(44, 48, 213, 0.3));
     }
     
     .input-container.active .input-icon {
       opacity: 1;
       transform: scale(1.15) rotate(5deg);
-      filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
+      filter: drop-shadow(0 0 8px rgba(44, 48, 213, 0.6));
     }
     
     .form-input {
@@ -1031,8 +1030,8 @@ function getStyles() {
     }
     
     .toggle-password:hover {
-      color: #3b82f6;
-      background: rgba(59, 130, 246, 0.1);
+      color: #2C30D5;
+      background: rgba(44, 48, 213, 0.1);
     }
     
     .form-options {
@@ -1082,12 +1081,12 @@ function getStyles() {
     }
     
     .checkbox-container:hover .checkmark {
-      border-color: #3b82f6;
-      background: rgba(59, 130, 246, 0.1);
+      border-color: #2C30D5;
+      background: rgba(44, 48, 213, 0.1);
     }
     
     .checkbox-container input:checked ~ .checkmark {
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      background: linear-gradient(135deg, #2C30D5, #889DD3);
       border-color: transparent;
       transform: scale(1.05);
     }
@@ -1120,7 +1119,7 @@ function getStyles() {
     }
     
     .forgot-password {
-      color: #3b82f6;
+      color: #2C30D5;
       text-decoration: none;
       transition: all 0.2s ease;
       font-weight: 600;
@@ -1134,7 +1133,7 @@ function getStyles() {
       height: 2px;
       bottom: -3px;
       left: 0;
-      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      background: linear-gradient(90deg, #2C30D5, #889DD3);
       transition: width 0.3s ease;
     }
     
@@ -1176,7 +1175,7 @@ function getStyles() {
     
     .login-button {
       flex: 1;
-      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      background: linear-gradient(135deg, #2C30D5 0%, #889DD3 100%);
       color: #ffffff;
       border-radius: 14px;
       border: none;
@@ -1185,7 +1184,7 @@ function getStyles() {
       padding: 16px 28px;
       font-size: 1.05rem;
       box-shadow: 
-        0 4px 14px rgba(59, 130, 246, 0.4),
+        0 4px 14px rgba(44, 48, 213, 0.4),
         0 0 0 1px rgba(255, 255, 255, 0.1);
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1305,7 +1304,7 @@ function getStyles() {
       font-weight: 800;
       font-size: 1.1rem;
       letter-spacing: 0.05em;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      background: linear-gradient(135deg, #2C30D5, #889DD3);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -1335,15 +1334,15 @@ function getStyles() {
     }
     
     .progress-step.active {
-      background: rgba(59, 130, 246, 0.2);
-      border-color: #3b82f6;
-      color: #3b82f6;
+      background: rgba(44, 48, 213, 0.2);
+      border-color: #2C30D5;
+      color: #2C30D5;
       transform: scale(1.15);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      box-shadow: 0 0 0 3px rgba(44, 48, 213, 0.1);
     }
     
     .progress-step.completed {
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      background: linear-gradient(135deg, #2C30D5, #889DD3);
       border-color: transparent;
       color: #ffffff;
     }
@@ -1375,7 +1374,7 @@ function getStyles() {
     .success-icon {
       width: 72px;
       height: 72px;
-      background: linear-gradient(135deg, #10b981, #059669);
+      background: linear-gradient(135deg, #11A561, #0d8550);
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -1383,7 +1382,7 @@ function getStyles() {
       color: #ffffff;
       margin-bottom: 24px;
       box-shadow: 
-        0 8px 24px rgba(16, 185, 129, 0.4),
+        0 8px 24px rgba(17, 165, 97, 0.4),
         0 0 0 1px rgba(255, 255, 255, 0.1);
       animation: successPulse 1s ease infinite;
     }
@@ -1434,7 +1433,7 @@ function getStyles() {
     }
     
     .back-link {
-      color: #3b82f6;
+      color: #2C30D5;
       text-decoration: none;
       font-weight: 600;
       transition: all 0.2s ease;

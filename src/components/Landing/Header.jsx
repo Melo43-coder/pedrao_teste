@@ -46,7 +46,7 @@ export default function Header() {
               userSelect: "none"
             }}
           >
-            Assistus
+            Zillo Assist
           </span>
           {/* Se tiver SVG da logo, coloque aqui com filtro verde, ex:
           <img src="/logo.svg" style={{height: 34, filter: "brightness(0) saturate(100%) invert(80%) sepia(12%) saturate(1000%) hue-rotate(90deg)" }}/>

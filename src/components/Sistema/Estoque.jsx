@@ -473,51 +473,53 @@ export default function Estoque() {
   // Estilos
   const styles = {
     container: {
-      padding: "24px",
+      padding: "clamp(12px, 3vw, 24px)",
       backgroundColor: "#f8fafc",
       minHeight: "100vh",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      maxWidth: "100%",
+      overflow: "hidden"
     },
     header: {
-      marginBottom: "24px"
+      marginBottom: "clamp(16px, 3vw, 24px)"
     },
     pageTitle: {
-      fontSize: "1.875rem",
+      fontSize: "clamp(1.25rem, 2.5vw, 1.875rem)",
       fontWeight: "700",
       color: "#0f172a",
       margin: "0 0 8px 0"
     },
     pageSubtitle: {
-      fontSize: "1rem",
+      fontSize: "clamp(0.875rem, 1.5vw, 1rem)",
       color: "#64748b",
       margin: 0
     },
     statsContainer: {
       display: "grid",
-      gridTemplateColumns: "repeat(4, 1fr)",
-      gap: "16px",
-      marginBottom: "24px"
+      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+      gap: "clamp(12px, 2vw, 16px)",
+      marginBottom: "clamp(16px, 3vw, 24px)"
     },
     statCard: {
       backgroundColor: "white",
       borderRadius: "12px",
-      padding: "20px",
+      padding: "clamp(16px, 2.5vw, 20px)",
       boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
       display: "flex",
       flexDirection: "column"
     },
     statValue: {
-      fontSize: "1.5rem",
+      fontSize: "clamp(1.125rem, 2vw, 1.5rem)",
       fontWeight: "700",
       color: "#0f172a",
       marginBottom: "4px"
     },
     statLabel: {
-      fontSize: "0.875rem",
+      fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
       color: "#64748b"
     },
     statHighlight: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     statWarning: {
       color: "#f59e0b"
@@ -527,44 +529,53 @@ export default function Estoque() {
     },
     actionBar: {
       display: "flex",
+      flexWrap: "wrap",
+      gap: "12px",
       justifyContent: "space-between",
-      marginBottom: "24px"
+      marginBottom: "clamp(16px, 3vw, 24px)"
     },
     searchContainer: {
       display: "flex",
-      gap: "12px"
+      flexWrap: "wrap",
+      gap: "12px",
+      flex: "1 1 auto"
     },
     searchInput: {
       padding: "10px 16px",
       borderRadius: "8px",
       border: "1px solid #e2e8f0",
-      width: "280px",
-      fontSize: "0.875rem"
+      minWidth: "200px",
+      maxWidth: "100%",
+      fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
+      flex: "1 1 auto"
     },
     select: {
       padding: "10px 16px",
       borderRadius: "8px",
       border: "1px solid #e2e8f0",
       backgroundColor: "white",
-      fontSize: "0.875rem"
+      fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
+      minWidth: "120px"
     },
     buttonGroup: {
       display: "flex",
+      flexWrap: "wrap",
       gap: "12px"
     },
     button: {
       padding: "10px 16px",
       borderRadius: "8px",
       border: "none",
-      fontSize: "0.875rem",
+      fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
       fontWeight: "600",
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      gap: "8px"
+      gap: "8px",
+      whiteSpace: "nowrap"
     },
     primaryButton: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     secondaryButton: {
@@ -581,23 +592,25 @@ export default function Estoque() {
       color: "#64748b"
     },
     tabContainer: {
-      marginBottom: "24px",
+      marginBottom: "clamp(16px, 3vw, 24px)",
       borderBottom: "1px solid #e2e8f0",
       display: "flex",
-      gap: "24px"
+      gap: "clamp(12px, 3vw, 24px)",
+      overflowX: "auto"
     },
     tab: {
       padding: "12px 4px",
-      fontSize: "0.875rem",
+      fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
       fontWeight: "600",
       color: "#64748b",
       cursor: "pointer",
       position: "relative",
       border: "none",
-      backgroundColor: "transparent"
+      backgroundColor: "transparent",
+      whiteSpace: "nowrap"
     },
     activeTab: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     activeTabIndicator: {
       position: "absolute",
@@ -605,24 +618,25 @@ export default function Estoque() {
       left: 0,
       width: "100%",
       height: "2px",
-      backgroundColor: "#0ea5e9"
+      backgroundColor: "#2C30D5"
     },
     tableContainer: {
       backgroundColor: "white",
       borderRadius: "12px",
       boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
       overflow: "auto",
-      maxWidth: "100%"
+      maxWidth: "100%",
+      WebkitOverflowScrolling: "touch"
     },
     table: {
       width: "100%",
       borderCollapse: "collapse",
-      minWidth: "1200px"
+      minWidth: "800px"
     },
     tableHeader: {
       backgroundColor: "#f8fafc",
-      padding: "12px 10px",
-      fontSize: "0.7rem",
+      padding: "clamp(8px, 1.5vw, 12px) clamp(6px, 1vw, 10px)",
+      fontSize: "clamp(0.625rem, 1vw, 0.7rem)",
       fontWeight: "600",
       color: "#64748b",
       textAlign: "left",
@@ -639,8 +653,8 @@ export default function Estoque() {
       backgroundColor: "#f1f5f9"
     },
     tableCell: {
-      padding: "10px 8px",
-      fontSize: "0.8rem",
+      padding: "clamp(8px, 1.5vw, 10px) clamp(6px, 1vw, 8px)",
+      fontSize: "clamp(0.7rem, 1.1vw, 0.8rem)",
       color: "#334155"
     },
     tableCellHighlight: {
@@ -716,7 +730,7 @@ export default function Estoque() {
       height: "40px",
       border: "3px solid rgba(203, 213, 225, 0.3)",
       borderRadius: "50%",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       animation: "spin 1s linear infinite",
       margin: "0 auto 16px auto"
     },
@@ -1092,7 +1106,7 @@ export default function Estoque() {
                             fontSize: '0.65rem',
                             border: 'none',
                             borderRadius: '3px',
-                            backgroundColor: '#3b82f6',
+                            backgroundColor: '#2C30D5',
                             color: 'white',
                             cursor: 'pointer',
                             fontWeight: '500',

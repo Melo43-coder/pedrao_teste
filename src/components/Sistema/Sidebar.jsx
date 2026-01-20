@@ -14,7 +14,7 @@ const items = [
 
 export default function Sidebar() {
   return (
-    <nav style={{background:"#e86c00",color:"#fff",height:"100vh",minWidth:"180px",padding:"28px 16px", position: "relative"}}>
+    <nav style={{background:"#2C30D5",color:"#fff",height:"100vh",minWidth:"180px",padding:"28px 16px", position: "relative"}}>
       {/* NotificationCenter */}
       <div style={{ position: "absolute", top: "20px", right: "15px", zIndex: 100 }}>
         <NotificationCenter />
@@ -26,7 +26,7 @@ export default function Sidebar() {
             <NavLink 
               to={`/dashboard/${it.rota}`} 
               style={({isActive})=>({
-                color:isActive?"#fff":"#ffe3ca",
+                color:isActive?"#fff":"#d4d8f7",
                 textDecoration:"none",
                 fontWeight:isActive?"bold":"normal",
                 fontSize:"15px",

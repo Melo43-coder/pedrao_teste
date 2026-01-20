@@ -17,6 +17,7 @@ import {
   removeFromStock,
   notifyAllUsers
 } from "../../services/firebase";
+import { formatCnpj, normalizeCnpj } from "../../utils/cnpj";
 
 const STATUS_COLORS = {
   "Recebido": { bg: "#e6f7ef", text: "#0d9f6f", icon: "✓" },
@@ -76,7 +77,7 @@ export default function Compras() {
 
   // Carregar CNPJ do localStorage e buscar dados
   useEffect(() => {
-    const cnpj = localStorage.getItem("userCnpj");
+    const cnpj = localStorage.getItem("companyCnpj");
     if (cnpj) {
       setCurrentCnpj(cnpj);
       loadAllData(cnpj);
@@ -117,7 +118,12 @@ export default function Compras() {
 
     try {
       setIsLoading(true);
-      await createSupplier(currentCnpj, novoFornecedor);
+      // Normalizar CNPJ antes de enviar (remover formatação)
+      const fornecedorData = {
+        ...novoFornecedor,
+        cnpj: normalizeCnpj(novoFornecedor.cnpj)
+      };
+      await createSupplier(currentCnpj, fornecedorData);
       setNovoFornecedor({
         nome: "",
         cnpj: "",
@@ -327,7 +333,7 @@ export default function Compras() {
       cursor: "pointer",
       transition: "all 0.2s ease",
       border: "none",
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     tabsContainer: {
@@ -346,8 +352,8 @@ export default function Compras() {
       transition: "all 0.2s ease"
     },
     tabActive: {
-      color: "#0ea5e9",
-      borderBottomColor: "#0ea5e9"
+      color: "#2C30D5",
+      borderBottomColor: "#2C30D5"
     },
     card: {
       backgroundColor: "white",
@@ -443,7 +449,7 @@ export default function Compras() {
     submitButton: {
       flex: 1,
       padding: "10px 16px",
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white",
       border: "none",
       borderRadius: "8px",
@@ -486,7 +492,7 @@ export default function Compras() {
       width: "20px",
       height: "20px",
       border: "3px solid #f3f4f6",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       borderRadius: "50%",
       animation: "spin 1s linear infinite"
     }
@@ -540,13 +546,13 @@ export default function Compras() {
             ➕ Novo Fornecedor
           </button>
           <button
-            style={{ ...styles.actionButton, backgroundColor: "#10b981" }}
+            style={{ ...styles.actionButton, backgroundColor: "#11A561" }}
             onClick={() => setShowNewProductForm(true)}
           >
             ➕ Novo Produto
           </button>
           <button
-            style={{ ...styles.actionButton, backgroundColor: "#8b5cf6" }}
+            style={{ ...styles.actionButton, backgroundColor: "#889DD3" }}
             onClick={() => setShowStockModal(true)}
           >
             📦 Gerenciar Estoque
@@ -880,10 +886,12 @@ export default function Compras() {
                   type="text"
                   style={styles.input}
                   value={novoFornecedor.cnpj}
-                  onChange={(e) =>
-                    setNovoFornecedor({ ...novoFornecedor, cnpj: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const formatted = formatCnpj(e.target.value);
+                    setNovoFornecedor({ ...novoFornecedor, cnpj: formatted });
+                  }}
                   placeholder="XX.XXX.XXX/0001-XX"
+                  maxLength={18}
                   required
                 />
               </div>

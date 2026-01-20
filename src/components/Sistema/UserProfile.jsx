@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import firebase from '../../services/firebase';
+import { uploadFile } from '../../utils/cnpj';
 
 const UserProfile = () => {
   const [userData, setUserData] = useState({
@@ -7,32 +9,95 @@ const UserProfile = () => {
     cargo: '',
     departamento: '',
     telefone: '',
-    foto: null
+    foto: null,
+    address: '',
+    addressNumber: ''
   });
   
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [saveStatus, setSaveStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   
-  // Carregar dados do usuário
+  // Carregar dados reais do usuário
   useEffect(() => {
-    // Simulando dados do usuário
-    const userName = localStorage.getItem("userName") || "Usuário";
-    const userEmail = localStorage.getItem("userEmail") || "usuario@assistus.com";
-    
-    // Dados fictícios para demonstração
-    const mockUserData = {
-      nome: userName,
-      email: userEmail,
-      cargo: "Gerente de Operações",
-      departamento: "Operações",
-      telefone: "(11) 98765-4321",
-      foto: null
-    };
-    
-    setUserData(mockUserData);
-    setFormData(mockUserData);
+    loadUserData();
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const userName = localStorage.getItem("userName");
+      const userEmail = localStorage.getItem("userEmail");
+      const companyCnpj = localStorage.getItem("companyCnpj");
+      
+      console.log('🔍 Carregando perfil - userName:', userName, '| email:', userEmail);
+      
+      if (!companyCnpj) {
+        console.error('CNPJ não encontrado');
+        return;
+      }
+
+      // Buscar dados do usuário no Firebase
+      const users = await firebase.listCompanyUsers(companyCnpj);
+      console.log('👥 Usuários disponíveis:', users.map(u => ({ username: u.username, email: u.email })));
+      
+      // Tentar encontrar por username primeiro, depois por email
+      let currentUser = users.find(u => u.username === userName);
+      
+      if (!currentUser && userEmail) {
+        console.log('⚠️ Usuário não encontrado por username, tentando por email...');
+        currentUser = users.find(u => u.email === userEmail);
+      }
+      
+      if (!currentUser && users.length > 0) {
+        console.log('⚠️ Usando primeiro usuário como fallback');
+        currentUser = users[0];
+      }
+      
+      if (currentUser) {
+        console.log('✅ Usuário encontrado:', currentUser.username);
+        
+        // Atualizar localStorage com o username correto
+        if (currentUser.username !== userName) {
+          console.log('🔄 Atualizando localStorage com username correto:', currentUser.username);
+          localStorage.setItem("userName", currentUser.username);
+        }
+        
+        const userDataLoaded = {
+          nome: currentUser.displayName || currentUser.username,
+          email: currentUser.email || '',
+          cargo: currentUser.role === 'admin' ? 'Administrador' : 
+                 currentUser.role === 'funcionario' ? 'Funcionário' : 'Prestador',
+          departamento: currentUser.departamento || 'Não definido',
+          telefone: currentUser.phone || '',
+          foto: currentUser.photoURL || null,
+          address: currentUser.address || '',
+          addressNumber: currentUser.addressNumber || '',
+          role: currentUser.role,
+          username: currentUser.username,
+          documentId: currentUser.id // Guardar o ID real do documento
+        };
+        
+        setUserData(userDataLoaded);
+        setFormData(userDataLoaded);
+      } else {
+        console.error('❌ Nenhum usuário encontrado');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error);
+      setSaveStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -42,31 +107,86 @@ const UserProfile = () => {
     });
   };
   
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      try {
+        setUploadingPhoto(true);
+        const photoURL = await uploadFile(file, 'profile-photos');
         setFormData({
           ...formData,
-          foto: reader.result
+          foto: photoURL
         });
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Erro ao fazer upload da foto:', error);
+        alert('Erro ao fazer upload da foto: ' + error.message);
+      } finally {
+        setUploadingPhoto(false);
+      }
     }
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Simulando salvamento
-    setSaveStatus('saving');
-    
-    setTimeout(() => {
-      setUserData(formData);
-      localStorage.setItem("userName", formData.nome);
-      localStorage.setItem("userEmail", formData.email);
+    try {
+      setSaveStatus('saving');
+      const companyCnpj = localStorage.getItem("companyCnpj");
       
+      // Usar o username que foi carregado dos dados do usuário
+      const userName = userData.username || localStorage.getItem("userName");
+      
+      console.log('🔍 Salvando perfil do usuário:', userName);
+      console.log('📊 Dados a atualizar:', {
+        displayName: formData.nome,
+        email: formData.email,
+        phone: formData.telefone,
+        departamento: formData.departamento
+      });
+      
+      // Preparar dados para atualização
+      const updateData = {
+        displayName: formData.nome,
+        email: formData.email,
+        phone: formData.telefone,
+        address: formData.address,
+        addressNumber: formData.addressNumber,
+        departamento: formData.departamento,
+        photoURL: formData.foto
+      };
+      
+      // Atualizar no Firebase
+      await firebase.updateUser(companyCnpj, userName, updateData);
+      
+      console.log('✅ Perfil atualizado com sucesso');
+      
+      // Atualizar localStorage
+      localStorage.setItem("userEmail", formData.email);
+      if (formData.nome) {
+  if (loading) {
+    return (
+      <div className="user-profile-page">
+        <div className="loading-container" style={{ textAlign: 'center', padding: '50px' }}>
+          <div className="spinner" style={{ 
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #3498db',
+            borderRadius: '50%',
+            width: '50px',
+            height: '50px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto'
+          }}></div>
+          <p style={{ marginTop: '20px' }}>Carregando perfil...</p>
+        </div>
+      </div>
+    );
+  }
+
+        localStorage.setItem("displayName", formData.nome);
+      }
+      
+      // Atualizar estado local
+      setUserData(formData);
       setSaveStatus('success');
       setIsEditing(false);
       
@@ -74,7 +194,50 @@ const UserProfile = () => {
       setTimeout(() => {
         setSaveStatus(null);
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error('Erro ao salvar perfil:', error);
+      setSaveStatus('error');
+      alert('Erro ao salvar perfil: ' + error.message);
+      
+      setTimeout(() => {
+        setSaveStatus(null);
+      }, 3000);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('As senhas não coincidem!');
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 6) {
+      alert('A senha deve ter pelo menos 6 caracteres!');
+      return;
+    }
+    
+    try {
+      const companyCnpj = localStorage.getItem("companyCnpj");
+      const userName = localStorage.getItem("userName");
+      
+      // Atualizar senha no Firebase
+      await firebase.updateUser(companyCnpj, userName, {
+        senha: passwordData.newPassword
+      });
+      
+      alert('Senha alterada com sucesso!');
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      alert('Erro ao alterar senha: ' + error.message);
+    }
   };
   
   const handleCancel = () => {
@@ -92,7 +255,7 @@ const UserProfile = () => {
       <div className="profile-content">
         <div className="profile-sidebar">
           <div className="profile-photo-container">
-            {(userData.foto || formData.foto) ? (
+            {(isEditing ? formData.foto : userData.foto) ? (
               <img 
                 src={isEditing ? formData.foto : userData.foto} 
                 alt="Foto de perfil" 
@@ -213,6 +376,32 @@ const UserProfile = () => {
                   </div>
                 </div>
                 
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="address">Endereço</label>
+                    <input 
+                      type="text" 
+                      id="address" 
+                      name="address" 
+                      value={formData.address || ''} 
+                      onChange={handleInputChange} 
+                      placeholder="Rua, Avenida..."
+                    />
+                  </div>
+                  
+                  <div className="form-group" style={{ maxWidth: '150px' }}>
+                    <label htmlFor="addressNumber">Número</label>
+                    <input 
+                      type="text" 
+                      id="addressNumber" 
+                      name="addressNumber" 
+                      value={formData.addressNumber || ''} 
+                      onChange={handleInputChange} 
+                      placeholder="123"
+                    />
+                  </div>
+                </div>
+                
                 <div className="form-actions">
                   {saveStatus === 'saving' ? (
                     <button type="button" className="save-button saving" disabled>
@@ -223,6 +412,9 @@ const UserProfile = () => {
                       Salvar Alterações
                     </button>
                   )}
+                  <button type="button" className="cancel-button" onClick={handleCancel}>
+                    Cancelar
+                  </button>
                 </div>
               </form>
             ) : (
@@ -247,22 +439,47 @@ const UserProfile = () => {
                   
                   <div className="info-group">
                     <label>Departamento</label>
-                    <p>{userData.departamento}</p>
+                    <p>{userData.departamento || 'Não definido'}</p>
                   </div>
                 </div>
                 
                 <div className="info-row">
                   <div className="info-group">
                     <label>Telefone</label>
-                    <p>{userData.telefone}</p>
+                    <p>{userData.telefone || 'Não informado'}</p>
+                  </div>
+                  
+                  <div className="info-group">
+                    <label>Endereço</label>
+                    <p>{userData.address ? `${userData.address}, ${userData.addressNumber || 'S/N'}` : 'Não informado'}</p>
                   </div>
                 </div>
               </div>
             )}
             
             {saveStatus === 'success' && (
-              <div className="save-success">
+              <div className="save-success" style={{
+                padding: '15px',
+                backgroundColor: '#d4f4e5',
+                color: '#11A561',
+                borderRadius: '8px',
+                marginTop: '15px',
+                border: '1px solid #c3e6cb'
+              }}>
                 ✓ Alterações salvas com sucesso!
+              </div>
+            )}
+            
+            {saveStatus === 'error' && (
+              <div className="save-error" style={{
+                padding: '15px',
+                backgroundColor: '#f8d7da',
+                color: '#721c24',
+                borderRadius: '8px',
+                marginTop: '15px',
+                border: '1px solid #f5c6cb'
+              }}>
+                ✗ Erro ao salvar alterações. Tente novamente.
               </div>
             )}
           </div>
@@ -275,7 +492,12 @@ const UserProfile = () => {
                   <h4>Alterar Senha</h4>
                   <p>Atualize sua senha para manter sua conta segura</p>
                 </div>
-                <button className="secondary-button">Alterar</button>
+                <button 
+                  className="secondary-button"
+                  onClick={() => setShowPasswordModal(true)}
+                >
+                  Alterar
+                </button>
               </div>
               
               <div className="security-option">
@@ -318,6 +540,136 @@ const UserProfile = () => {
           </div>
         </div>
       </div>
+      
+      {/* Modal de Alterar Senha */}
+      {showPasswordModal && (
+        <div className="modal-overlay" onClick={() => setShowPasswordModal(false)} style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+          }}>
+            <h2 style={{ marginBottom: '20px' }}>Alterar Senha</h2>
+            
+            <form onSubmit={handlePasswordChange}>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label htmlFor="currentPassword" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                  Senha Atual
+                </label>
+                <input 
+                  type="password" 
+                  id="currentPassword" 
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}
+                  required
+                />
+              </div>
+              
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label htmlFor="newPassword" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                  Nova Senha
+                </label>
+                <input 
+                  type="password" 
+                  id="newPassword" 
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}
+                  minLength={6}
+                  required
+                />
+              </div>
+              
+              <div className="form-group" style={{ marginBottom: '25px' }}>
+                <label htmlFor="confirmPassword" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                  Confirmar Nova Senha
+                </label>
+                <input 
+                  type="password" 
+                  id="confirmPassword" 
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}
+                  minLength={6}
+                  required
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordData({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: '1px solid #ddd',
+                    backgroundColor: 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#2C30D5',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Alterar Senha
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

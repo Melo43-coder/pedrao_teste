@@ -989,13 +989,13 @@ export default function GestaoFinanceira() {
       color: "#64748b"
     },
     statPositive: {
-      color: "#10b981"
+      color: "#11A561"
     },
     statNegative: {
       color: "#ef4444"
     },
     statNeutral: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     tabContainer: {
       marginBottom: "24px",
@@ -1014,7 +1014,7 @@ export default function GestaoFinanceira() {
       backgroundColor: "transparent"
     },
     activeTab: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     activeTabIndicator: {
       position: "absolute",
@@ -1022,7 +1022,7 @@ export default function GestaoFinanceira() {
       left: 0,
       width: "100%",
       height: "2px",
-      backgroundColor: "#0ea5e9"
+      backgroundColor: "#2C30D5"
     },
     filterBar: {
       display: "flex",
@@ -1113,11 +1113,11 @@ export default function GestaoFinanceira() {
     },
     statusPago: {
       backgroundColor: "#dcfce7",
-      color: "#10b981"
+      color: "#11A561"
     },
     statusPendente: {
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     statusAtrasado: {
       backgroundColor: "#fee2e2",
@@ -1135,11 +1135,11 @@ export default function GestaoFinanceira() {
       gap: "8px"
     },
     primaryButton: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     successButton: {
-      backgroundColor: "#10b981",
+      backgroundColor: "#11A561",
       color: "white"
     },
     dangerButton: {
@@ -1161,7 +1161,7 @@ export default function GestaoFinanceira() {
       height: "40px",
       border: "3px solid rgba(203, 213, 225, 0.3)",
       borderRadius: "50%",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       animation: "spin 1s linear infinite",
       margin: "0 auto 16px auto"
     },
@@ -1318,7 +1318,7 @@ export default function GestaoFinanceira() {
       padding: "2px 8px",
       borderRadius: "9999px",
       backgroundColor: "#e0f2fe",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     contaBancariaInfo: {
       fontSize: "0.875rem",
@@ -1328,7 +1328,7 @@ export default function GestaoFinanceira() {
     contaBancariaSaldo: {
       fontSize: "1.25rem",
       fontWeight: "700",
-      color: "#10b981"
+      color: "#11A561"
     },
     contaBancariaAtualizacao: {
       fontSize: "0.75rem",
@@ -1366,9 +1366,9 @@ export default function GestaoFinanceira() {
       cursor: "pointer"
     },
     periodoButtonActive: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white",
-      borderColor: "#0ea5e9"
+      borderColor: "#2C30D5"
     },
     relatorioCard: {
       backgroundColor: "#f8fafc",
@@ -2203,7 +2203,7 @@ export default function GestaoFinanceira() {
                             ...styles.detailsValue, 
                             fontSize: "1.25rem", 
                             fontWeight: "700",
-                            color: conta.saldoAtual >= 0 ? "#10b981" : "#ef4444"
+                            color: conta.saldoAtual >= 0 ? "#11A561" : "#ef4444"
                           }}>
                             {formatarMoeda(conta.saldoAtual)}
                           </div>
@@ -2289,7 +2289,7 @@ export default function GestaoFinanceira() {
                 
                 <div style={styles.relatorioGrid}>
                   <div style={styles.relatorioItem}>
-                    <div style={{...styles.relatorioValor, color: "#10b981"}}>
+                    <div style={{...styles.relatorioValor, color: "#11A561"}}>
                       {formatarMoeda(calcularTotalReceitas(periodoSelecionado))}
                     </div>
                     <div style={styles.relatorioLabel}>Receitas Totais</div>
@@ -2324,7 +2324,7 @@ export default function GestaoFinanceira() {
                     <div style={{
                       fontSize: "1.5rem",
                       fontWeight: "700",
-                      color: calcularLucroLiquido(periodoSelecionado) >= 0 ? "#10b981" : "#ef4444"
+                      color: calcularLucroLiquido(periodoSelecionado) >= 0 ? "#11A561" : "#ef4444"
                     }}>
                       {formatarMoeda(calcularLucroLiquido(periodoSelecionado))}
                     </div>
@@ -2332,7 +2332,7 @@ export default function GestaoFinanceira() {
                   
                   <div style={{
                     backgroundColor: calcularLucroLiquido(periodoSelecionado) >= 0 ? "#dcfce7" : "#fee2e2",
-                    color: calcularLucroLiquido(periodoSelecionado) >= 0 ? "#10b981" : "#ef4444",
+                    color: calcularLucroLiquido(periodoSelecionado) >= 0 ? "#11A561" : "#ef4444",
                     padding: "8px 16px",
                     borderRadius: "8px",
                     fontWeight: "600",
@@ -2972,7 +2972,7 @@ export default function GestaoFinanceira() {
                   <div style={styles.detailsGrid}>
                     <div>
                       <div style={styles.detailsLabel}>Valor</div>
-                      <div style={{...styles.detailsValue, color: "#10b981", fontWeight: "700"}}>
+                      <div style={{...styles.detailsValue, color: "#11A561", fontWeight: "700"}}>
                         {formatarMoeda(itemSelecionado.valor)}
                       </div>
                     </div>

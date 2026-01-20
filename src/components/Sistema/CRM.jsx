@@ -1046,7 +1046,7 @@ export default function CRM() {
       }
     },
     areaButtonActive: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     areaButtonInactive: {
@@ -1085,7 +1085,7 @@ export default function CRM() {
       color: "#64748b"
     },
     statHighlight: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     actionBar: {
       display: "flex",
@@ -1153,15 +1153,15 @@ export default function CRM() {
       }
     },
     primaryButton: {
-      backgroundColor: "#0ea5e9",
+      backgroundColor: "#2C30D5",
       color: "white"
     },
     secondaryButton: {
-      backgroundColor: "#8b5cf6",
+      backgroundColor: "#889DD3",
       color: "white"
     },
     successButton: {
-      backgroundColor: "#10b981",
+      backgroundColor: "#11A561",
       color: "white"
     },
     warningButton: {
@@ -1202,7 +1202,7 @@ export default function CRM() {
       }
     },
     activeTab: {
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     activeTabIndicator: {
       position: "absolute",
@@ -1210,7 +1210,7 @@ export default function CRM() {
       left: 0,
       width: "100%",
       height: "2px",
-      backgroundColor: "#0ea5e9"
+      backgroundColor: "#2C30D5"
     },
     contentContainer: {
       display: "grid",
@@ -1454,7 +1454,7 @@ export default function CRM() {
     historicoTipo: {
       fontSize: "0.75rem",
       fontWeight: "600",
-      color: "#0ea5e9"
+      color: "#2C30D5"
     },
     historicoData: {
       fontSize: "0.75rem",
@@ -1581,7 +1581,7 @@ export default function CRM() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      color: "#0ea5e9",
+      color: "#2C30D5",
       fontWeight: "600"
     },
     conversaInfo: {
@@ -1608,7 +1608,7 @@ export default function CRM() {
       padding: "16px",
       borderRadius: "12px",
       backgroundColor: "#f8fafc",
-      borderLeft: "4px solid #0ea5e9"
+      borderLeft: "4px solid #2C30D5"
     },
     tarefaItemAlta: {
       borderLeftColor: "#ef4444"
@@ -1617,7 +1617,7 @@ export default function CRM() {
       borderLeftColor: "#f59e0b"
     },
     tarefaItemBaixa: {
-      borderLeftColor: "#10b981"
+      borderLeftColor: "#11A561"
     },
     tarefaHeader: {
       display: "flex",
@@ -1671,7 +1671,7 @@ export default function CRM() {
       height: "40px",
       border: "3px solid rgba(203, 213, 225, 0.3)",
       borderRadius: "50%",
-      borderTop: "3px solid #0ea5e9",
+      borderTop: "3px solid #2C30D5",
       animation: "spin 1s linear infinite",
       margin: "0 auto 16px auto"
     },
@@ -1866,7 +1866,7 @@ export default function CRM() {
             <button 
               style={{
                 ...styles.areaButton,
-                backgroundColor: "#10b981",
+                backgroundColor: "#11A561",
                 color: "white"
               }}
               onClick={() => {

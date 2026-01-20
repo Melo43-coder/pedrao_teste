@@ -1,8 +1,11 @@
-/* Estilos Globais */
+/* Estilos Globais - Paleta Zillo */
 :root {
-  --primary: #0ea5e9;
-  --primary-light: #f0f9ff;
-  --primary-dark: #0284c7;
+  --primary: #2C30D5;
+  --primary-light: #e8e9fb;
+  --primary-dark: #1f2299;
+  --secondary: #889DD3;
+  --success: #11A561;
+  --accent: #32DAF3;
   --text-dark: #0f172a;
   --text-medium: #334155;
   --text-light: #64748b;
@@ -574,6 +577,28 @@ body {
   align-items: center;
   justify-content: center;
   border: 2px solid white;
+}
+
+/* Botão P de Prestador */
+.prestador-button {
+  position: relative;
+  background: linear-gradient(135deg, #11A561 0%, #0d8f51 100%) !important;
+  color: white !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+  letter-spacing: 0.5px;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.prestador-button:hover {
+  background: linear-gradient(135deg, #0d8f51 0%, #0a7340 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(17, 165, 97, 0.4);
+}
+
+.prestador-button:active {
+  transform: translateY(0);
 }
 
 .notifications-dropdown {

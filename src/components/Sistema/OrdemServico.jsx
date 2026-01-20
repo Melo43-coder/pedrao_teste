@@ -1,26 +1,30 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   FiFileText, FiAlertTriangle, FiClock, FiCheckCircle, 
   FiXCircle, FiPlusCircle, FiFilter, FiEdit3, FiEye, 
   FiCheck, FiSearch, FiRefreshCw, FiCalendar, FiUser,
-  FiBarChart2, FiActivity, FiMapPin, FiPhone, FiMail
+  FiBarChart2, FiActivity, FiMapPin, FiPhone, FiMail,
+  FiMessageSquare, FiCheckSquare, FiInfo, FiImage, FiPaperclip
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import firebase from "../../services/firebase";
+import { db } from "../../firebase/firebaseConfig";
+import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc } from "firebase/firestore";
+import jsPDF from 'jspdf';
 
 // Dados de status e prioridades
 const OSSTATUS = [
   { nome: "Pendente", cor: "#f59e0b", bgColor: "#fef3c7", icon: <FiClock /> },
-  { nome: "Em andamento", cor: "#3b82f6", bgColor: "#dbeafe", icon: <FiActivity /> },
-  { nome: "Aguardando Peça", cor: "#8b5cf6", bgColor: "#ede9fe", icon: <FiAlertTriangle /> },
-  { nome: "Concluída", cor: "#10b981", bgColor: "#d1fae5", icon: <FiCheckCircle /> },
+  { nome: "Em andamento", cor: "#2C30D5", bgColor: "#e8e9fb", icon: <FiActivity /> },
+  { nome: "Aguardando Peça", cor: "#889DD3", bgColor: "#ede9fe", icon: <FiAlertTriangle /> },
+  { nome: "Concluída", cor: "#11A561", bgColor: "#d4f4e5", icon: <FiCheckCircle /> },
   { nome: "Cancelada", cor: "#ef4444", bgColor: "#fee2e2", icon: <FiXCircle /> }
 ];
 
 const PRIORIDADES = [
   { nome: "Alta", cor: "#ef4444", bgColor: "#fee2e2" },
   { nome: "Média", cor: "#f59e0b", bgColor: "#fef3c7" },
-  { nome: "Baixa", cor: "#10b981", bgColor: "#d1fae5" }
+  { nome: "Baixa", cor: "#11A561", bgColor: "#d4f4e5" }
 ];
 
 // Funções de estilo
@@ -39,6 +43,7 @@ export default function OrdemServico() {
   const [filtroPrioridade, setFiltroPrioridade] = useState("");
   const [pesquisa, setPesquisa] = useState("");
   const [nova, setNova] = useState({
+    codigo: "",
     nomeCliente: "",
     telefoneCliente: "",
     emailCliente: "",
@@ -54,14 +59,225 @@ export default function OrdemServico() {
     responsavel: "",
     descricao: ""
   });
+
+  // Função para gerar código aleatório
+  const gerarCodigoAleatorio = () => {
+    const prefixo = "OS";
+    const ano = new Date().getFullYear().toString().slice(-2);
+    const numero = Math.floor(Math.random() * 99999).toString().padStart(5, '0');
+    return `${prefixo}-${ano}${numero}`;
+  };
   const [showForm, setShowForm] = useState(false);
   const [detalhesOS, setDetalhesOS] = useState(null);
+  const [abaDetalhesOS, setAbaDetalhesOS] = useState('info'); // 'info', 'chat', 'checklist'
+  const [mensagensChat, setMensagensChat] = useState([]);
+  const [novaMensagemChat, setNovaMensagemChat] = useState('');
+  const [editandoOS, setEditandoOS] = useState(null);
   const [atualizando, setAtualizando] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mensagensCliente, setMensagensCliente] = useState({});
   const [inputMensagem, setInputMensagem] = useState({});
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina] = useState(10);
+  const [checklistPrestador, setChecklistPrestador] = useState(null);
+  const [mensagensNaoLidas, setMensagensNaoLidas] = useState({});
+  const chatScrollRef = useRef(null);
+  const fileInputRef = useRef(null);
   const companyCnpj = localStorage.getItem("companyCnpj") || "";
+  const currentUserName = localStorage.getItem("userName") || "Você";
+
+  // Efeito para carregar mensagens do chat quando abrir uma OS
+  useEffect(() => {
+    if (!detalhesOS || !detalhesOS.id || !companyCnpj) return;
+
+    console.log('📱 Iniciando listener de mensagens para OS:', detalhesOS.codigo);
+    console.log('📍 Caminho:', `companies/${companyCnpj}/serviceOrders/${detalhesOS.id}/messages`);
+
+    const messagesRef = collection(db, 'companies', companyCnpj, 'serviceOrders', detalhesOS.id, 'messages');
+    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('📨 Mensagens recebidas:', snapshot.size);
+      
+      const msgs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('💬 Mensagens processadas:', msgs);
+      
+      // Contar mensagens não lidas (não enviadas pelo usuário atual)
+      const naoLidas = msgs.filter(m => !m.enviado && !m.lida).length;
+      setMensagensNaoLidas(prev => ({ ...prev, [detalhesOS.codigo]: naoLidas }));
+      
+      setMensagensCliente(prev => ({ ...prev, [detalhesOS.codigo]: msgs }));
+      
+      // Scroll automático para última mensagem
+      setTimeout(() => {
+        if (chatScrollRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      }, 100);
+    }, (error) => {
+      console.error("❌ Erro ao carregar mensagens:", error);
+    });
+
+    return () => unsubscribe();
+  }, [detalhesOS, companyCnpj]);
+
+  // Efeito para carregar checklist do prestador quando abrir a aba de checklist
+  useEffect(() => {
+    async function loadChecklistPrestador() {
+      if (!detalhesOS || !detalhesOS.id || !companyCnpj) return;
+      
+      try {
+        const osDocRef = doc(db, 'companies', companyCnpj, 'serviceOrders', detalhesOS.id);
+        const osDocSnap = await getDoc(osDocRef);
+        
+        if (osDocSnap.exists()) {
+          const data = osDocSnap.data();
+          // Verificar se existem dados das etapas do prestador
+          if (data.etapa1 || data.etapa2 || data.etapa3 || data.estado) {
+            const checklistData = {
+              estado: data.estado || '',
+              etapa1: data.etapa1 || null,
+              etapa2: data.etapa2 || null,
+              etapa3: data.etapa3 || null,
+              logoBase64: '' // Inicializa sem logo
+            };
+            
+            // Buscar logo da checklist configurada
+            try {
+              const checklistsDb = await firebase.listarChecklists(companyCnpj);
+              
+              // Primeiro tenta buscar pela checklistId específica da OS
+              if (data.checklistId) {
+                const checklist = checklistsDb.find(c => c.id === data.checklistId);
+                if (checklist && checklist.logoBase64) {
+                  checklistData.logoBase64 = checklist.logoBase64;
+                  console.log('✅ Logo da checklist específica carregada:', checklist.nome);
+                }
+              }
+              
+              // Se não encontrou, usa a primeira checklist que tiver logo
+              if (!checklistData.logoBase64 && checklistsDb.length > 0) {
+                const checklistComLogo = checklistsDb.find(c => c.logoBase64);
+                if (checklistComLogo) {
+                  checklistData.logoBase64 = checklistComLogo.logoBase64;
+                  console.log('✅ Logo da checklist padrão carregada:', checklistComLogo.nome);
+                }
+              }
+            } catch (err) {
+              console.log('⚠️ Erro ao buscar logo da checklist:', err);
+            }
+            
+            setChecklistPrestador(checklistData);
+          } else {
+            setChecklistPrestador(null);
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar checklist do prestador:", error);
+        setChecklistPrestador(null);
+      }
+    }
+    
+    if (abaDetalhesOS === 'checklist') {
+      loadChecklistPrestador();
+    }
+  }, [detalhesOS, companyCnpj, abaDetalhesOS]);
+
+  // Efeito para monitorar mudanças nas etapas e criar notificações
+  useEffect(() => {
+    if (!detalhesOS || !detalhesOS.id || !companyCnpj) return;
+
+    const osDocRef = doc(db, 'companies', companyCnpj, 'serviceOrders', detalhesOS.id);
+    
+    const unsubscribe = onSnapshot(osDocRef, async (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        const userName = localStorage.getItem('userName') || 'Sistema';
+        
+        // Notificação de aceite do prestador
+        if (data.prestadorAceitou && !data.notificacaoAceiteEnviada) {
+          try {
+            await firebase.createNotification(companyCnpj, {
+              title: '✅ Prestador Aceitou o Serviço',
+              message: `O prestador aceitou a OS #${detalhesOS.codigo}`,
+              type: 'aceite',
+              osId: detalhesOS.id,
+              osCodigo: detalhesOS.codigo,
+              userId: 'all',
+              createdBy: userName
+            });
+            // Marcar que a notificação foi enviada
+            await firebase.updateServiceOrder(companyCnpj, detalhesOS.id, { notificacaoAceiteEnviada: true });
+          } catch (error) {
+            console.error('Erro ao criar notificação de aceite:', error);
+          }
+        }
+        
+        // Notificação de etapa 1 completa
+        if (data.etapa1?.completedAt && !data.notificacaoEtapa1Enviada) {
+          try {
+            await firebase.createNotification(companyCnpj, {
+              title: '🔍 Etapa 1 Concluída',
+              message: `Reconhecimento da OS #${detalhesOS.codigo} foi concluído`,
+              type: 'etapa',
+              osId: detalhesOS.id,
+              osCodigo: detalhesOS.codigo,
+              userId: 'all',
+              createdBy: userName
+            });
+            await firebase.updateServiceOrder(companyCnpj, detalhesOS.id, { notificacaoEtapa1Enviada: true });
+          } catch (error) {
+            console.error('Erro ao criar notificação etapa 1:', error);
+          }
+        }
+        
+        // Notificação de etapa 2 completa (checklist)
+        if (data.etapa2?.completedAt && !data.notificacaoEtapa2Enviada) {
+          try {
+            await firebase.createNotification(companyCnpj, {
+              title: '📋 Checklist Recebido',
+              message: `Checklist da OS #${detalhesOS.codigo} foi completado pelo prestador`,
+              type: 'checklist',
+              osId: detalhesOS.id,
+              osCodigo: detalhesOS.codigo,
+              userId: 'all',
+              createdBy: userName
+            });
+            await firebase.updateServiceOrder(companyCnpj, detalhesOS.id, { notificacaoEtapa2Enviada: true });
+          } catch (error) {
+            console.error('Erro ao criar notificação checklist:', error);
+          }
+        }
+        
+        // Notificação de etapa 3 completa (conclusão)
+        if (data.etapa3?.completedAt && !data.notificacaoConclusaoEnviada) {
+          try {
+            await firebase.createNotification(companyCnpj, {
+              title: '✅ Serviço Concluído',
+              message: `OS #${detalhesOS.codigo} foi finalizada com assinatura do cliente`,
+              type: 'conclusao',
+              osId: detalhesOS.id,
+              osCodigo: detalhesOS.codigo,
+              userId: 'all',
+              createdBy: userName
+            });
+            await firebase.updateServiceOrder(companyCnpj, detalhesOS.id, { notificacaoConclusaoEnviada: true });
+          } catch (error) {
+            console.error('Erro ao criar notificação de conclusão:', error);
+          }
+        }
+      }
+    }, (error) => {
+      console.error('Erro ao monitorar mudanças na OS:', error);
+    });
+
+    return () => unsubscribe();
+  }, [detalhesOS, companyCnpj]);
 
   // Efeito para carregar ordens e usuários do Firebase ao montar
   useEffect(() => {
@@ -142,25 +358,645 @@ export default function OrdemServico() {
     }
   };
 
-  const handleEnviarMensagemCliente = (osId, mensagem) => {
-    if (!mensagem.trim()) return;
+  const handleEnviarMensagemCliente = async (osId, mensagem, arquivo = null) => {
+    if ((!mensagem || !mensagem.trim()) && !arquivo) return;
     
-    // Adicionar mensagem ao estado local
-    setMensagensCliente(prev => ({
-      ...prev,
-      [osId]: [...(prev[osId] || []), {
-        id: Date.now(),
-        texto: mensagem,
+    try {
+      console.log('📤 Enviando mensagem para OS:', osId);
+      
+      // Buscar o ID real da OS (documento Firebase)
+      const os = ordens.find(o => o.codigo === osId);
+      if (!os || !os.id) {
+        console.error("❌ OS não encontrada");
+        alert("Erro: OS não encontrada");
+        return;
+      }
+
+      console.log('✅ OS encontrada, ID:', os.id);
+
+      let arquivoURL = null;
+      let tipoArquivo = null;
+      
+      // Upload de arquivo se houver
+      if (arquivo) {
+        console.log('📎 Processando arquivo:', arquivo.name);
+        const formData = new FormData();
+        formData.append('file', arquivo);
+        
+        // Você pode usar uploadFile do utils/cnpj.js ou fazer upload direto
+        // Por enquanto vou simular com base64 para imagens pequenas
+        if (arquivo.type.startsWith('image/')) {
+          arquivoURL = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(arquivo);
+          });
+          tipoArquivo = 'imagem';
+          console.log('🖼️ Imagem convertida para base64');
+        }
+      }
+
+      const mensagemData = {
+        texto: mensagem?.trim() || '',
         enviado: true,
-        data: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      }]
-    }));
+        remetente: currentUserName,
+        data: new Date().toLocaleString('pt-BR', { 
+          day: '2-digit', 
+          month: '2-digit', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        timestamp: new Date().toISOString(),
+        ...(arquivoURL && { arquivo: arquivoURL, tipoArquivo }),
+        lida: false
+      };
+
+      console.log('💾 Salvando mensagem:', mensagemData);
+
+      // Salvar mensagem no Firebase
+      const messagesRef = collection(db, 'companies', companyCnpj, 'serviceOrders', os.id, 'messages');
+      const docRef = await addDoc(messagesRef, mensagemData);
+      
+      console.log('✅ Mensagem salva com ID:', docRef.id);
+      
+      // Limpar input e arquivo
+      setInputMensagem(prev => ({
+        ...prev,
+        [osId]: ''
+      }));
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error("❌ Erro ao enviar mensagem:", error);
+      alert("Erro ao enviar mensagem: " + error.message);
+    }
+  };
+
+  // Função para gerar PDF do checklist
+  const handleGerarPDF = async () => {
+    if (!checklistPrestador || !detalhesOS) return;
     
-    // Limpar input usando estado
-    setInputMensagem(prev => ({
-      ...prev,
-      [osId]: ''
-    }));
+    console.log('📄 Gerando PDF com dados:', {
+      codigo: detalhesOS.codigo,
+      nomeCliente: detalhesOS.nomeCliente,
+      telefoneCliente: detalhesOS.telefoneCliente,
+      emailCliente: detalhesOS.emailCliente,
+      endereco: detalhesOS.endereco,
+      cidade: detalhesOS.cidade,
+      cep: detalhesOS.cep
+    });
+    
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      let yPosition = margin;
+      
+      // Função auxiliar para converter valores em string segura
+      const safeText = (value, defaultValue = 'NÃO INFORMADO') => {
+        if (value === null || value === undefined || value === '') return defaultValue;
+        return String(value);
+      };
+      
+      // Função para adicionar linha horizontal
+      const addHorizontalLine = (y) => {
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, y, pageWidth - margin, y);
+      };
+      
+      // ========== CABEÇALHO ==========
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, 26, 'F');
+      
+      // Logo da empresa/checklist (se existir)
+      console.log('🖼️ Verificando logo:', checklistPrestador.logoBase64 ? 'Logo encontrada' : 'Sem logo');
+      if (checklistPrestador.logoBase64) {
+        try {
+          const logoWidth = 22;
+          const logoHeight = 22;
+          const logoX = margin;
+          const logoY = 2;
+          pdf.addImage(checklistPrestador.logoBase64, 'PNG', logoX, logoY, logoWidth, logoHeight);
+          console.log('✅ Logo adicionada ao PDF com sucesso');
+        } catch (error) {
+          console.error('❌ Erro ao adicionar logo ao PDF:', error);
+        }
+      }
+      
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('CHECKLIST', pageWidth / 2, 10, { align: 'center' });
+      
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      const empresaCNPJ = companyCnpj || 'NÃO INFORMADO';
+      pdf.text(`CNPJ: ${empresaCNPJ}`, pageWidth / 2, 16, { align: 'center' });
+      
+      // Adicionar Horário de Chegada no header
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      if (checklistPrestador.etapa1 && checklistPrestador.etapa1.horaReconhecimento) {
+        const horarioChegada = new Date(checklistPrestador.etapa1.horaReconhecimento).toLocaleString('pt-BR');
+        pdf.text(`Horário de chegada: ${horarioChegada}`, pageWidth / 2, 22, { align: 'center' });
+      }
+      
+      yPosition = 29;
+      
+      // ========== DADOS DA ASSISTÊNCIA ==========
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('DADOS DA ASSISTÊNCIA', margin, yPosition);
+      yPosition += 1;
+      addHorizontalLine(yPosition);
+      yPosition += 5;
+      
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('OS Nº:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`#${detalhesOS.codigo}`, margin + 18, yPosition);
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Data/Hora:', pageWidth / 2, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(new Date().toLocaleString('pt-BR'), pageWidth / 2 + 22, yPosition);
+      yPosition += 4.5;
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Profissional:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.responsavel), margin + 26, yPosition);
+      yPosition += 4.5;
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Produto/Serviço:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.descricao).substring(0, 80), margin + 33, yPosition);
+      yPosition += 4.5;
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Endereço:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      const enderecoCompleto = `${safeText(detalhesOS.endereco)}, ${safeText(detalhesOS.numero)} - ${safeText(detalhesOS.cidade)}/${safeText(detalhesOS.estado)}`;
+      const enderecoLines = pdf.splitTextToSize(enderecoCompleto, contentWidth - 23);
+      pdf.text(enderecoLines, margin + 23, yPosition);
+      yPosition += enderecoLines.length * 4 + 5;
+      
+      // ========== DADOS DO CLIENTE/SEGURADO ==========
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text('DADOS DO CLIENTE', margin, yPosition);
+      yPosition += 1;
+      addHorizontalLine(yPosition);
+      yPosition += 5;
+      
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Nome:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.nomeCliente), margin + 18, yPosition);
+      yPosition += 4.5;
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Telefone:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.telefoneCliente), margin + 23, yPosition);
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('E-mail:', pageWidth / 2, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.emailCliente), pageWidth / 2 + 16, yPosition);
+      yPosition += 4.5;
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('CEP:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.cep), margin + 13, yPosition);
+      yPosition += 6;
+      
+      // ========== DETALHAMENTO DO SERVIÇO ==========
+      if (yPosition > pageHeight - 60) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text('DETALHAMENTO DO SERVIÇO', margin, yPosition);
+      yPosition += 1;
+      addHorizontalLine(yPosition);
+      yPosition += 5;
+      
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Status:', margin, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.status), margin + 18, yPosition);
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Prioridade:', pageWidth / 2, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(safeText(detalhesOS.prioridade), pageWidth / 2 + 23, yPosition);
+      yPosition += 4.5;
+      
+      if (checklistPrestador.etapa1 && checklistPrestador.etapa1.horaReconhecimento) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Situação:', margin, yPosition);
+        pdf.setFont('helvetica', 'normal');
+        const situacao = checklistPrestador.etapa1.dadosConfirmados ? 'CONFIRMADO' : 'PENDENTE';
+        pdf.text(situacao, margin + 21, yPosition);
+        yPosition += 4.5;
+      }
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Observações:', margin, yPosition);
+      yPosition += 4;
+      pdf.setFont('helvetica', 'normal');
+      const obsLines = pdf.splitTextToSize(safeText(detalhesOS.descricao), contentWidth - 5);
+      pdf.text(obsLines, margin + 5, yPosition);
+      yPosition += obsLines.length * 4 + 6;
+      
+      // ========== CHECKLIST DE EXECUÇÃO ==========
+      if (yPosition > pageHeight - 50) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text('CHECKLIST DE EXECUÇÃO', margin, yPosition);
+      yPosition += 1;
+      addHorizontalLine(yPosition);
+      yPosition += 5;
+      
+      // === ANTES DA EXECUÇÃO ===
+      if (checklistPrestador.etapa1) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text('ANTES DA EXECUÇÃO', margin, yPosition);
+        yPosition += 4.5;
+        
+        pdf.setFontSize(9);
+        
+        if (checklistPrestador.etapa1.dadosConfirmados !== undefined) {
+          const checkbox = checklistPrestador.etapa1.dadosConfirmados ? '[X]' : '[ ]';
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`${checkbox} Dados do cliente confirmados`, margin + 3, yPosition);
+          yPosition += 4.5;
+        }
+        
+        if (checklistPrestador.estado) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.text('[ ] Localização verificada:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(safeText(checklistPrestador.estado), margin + 50, yPosition);
+          yPosition += 4.5;
+        }
+        
+        yPosition += 2;
+      }
+      
+      // === DURANTE A EXECUÇÃO ===
+      if (checklistPrestador.etapa2) {
+        if (yPosition > pageHeight - 50) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text('DURANTE A EXECUÇÃO', margin, yPosition);
+        yPosition += 4.5;
+        
+        pdf.setFontSize(9);
+        
+        // Itens do checklist
+        if (checklistPrestador.etapa2.checklist && checklistPrestador.etapa2.checklist.length > 0) {
+          checklistPrestador.etapa2.checklist.forEach((item, index) => {
+            if (yPosition > pageHeight - 40) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+            
+            const checkbox = item.checked ? '[X]' : '[ ]';
+            const obrigatorio = item.obrigatorio ? '*' : '';
+            
+            pdf.setFont('helvetica', 'normal');
+            
+            // Tratamento especial para múltipla escolha
+            if (item.tipo === 'multipla_escolha') {
+              const itemTitle = `${checkbox}${obrigatorio} ${safeText(item.label, 'Item')}`;
+              const titleLines = pdf.splitTextToSize(itemTitle, contentWidth - 6);
+              pdf.text(titleLines, margin + 3, yPosition);
+              yPosition += titleLines.length * 3.5;
+              
+              // Mostrar apenas as opções selecionadas
+              if (item.opçõesSelecionadas && item.opçõesSelecionadas.length > 0) {
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'italic');
+                item.opçõesSelecionadas.forEach(opcao => {
+                  const opcaoText = `    ✓ ${safeText(opcao, 'Opção')}`;
+                  const opcaoLines = pdf.splitTextToSize(opcaoText, contentWidth - 10);
+                  pdf.text(opcaoLines, margin + 3, yPosition);
+                  yPosition += opcaoLines.length * 3.5;
+                });
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'normal');
+              } else if (item.opcoes && Array.isArray(item.opcoes)) {
+                // Fallback: se opçõesSelecionadas não existir, mostrar todas com indicação de seleção
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'italic');
+                item.opcoes.forEach(opcao => {
+                  const isSelecionada = typeof opcao === 'object' ? opcao.selecionada : false;
+                  const nomeOpcao = typeof opcao === 'object' ? opcao.nome : opcao;
+                  if (isSelecionada) {
+                    const opcaoText = `    ✓ ${safeText(nomeOpcao, 'Opção')}`;
+                    const opcaoLines = pdf.splitTextToSize(opcaoText, contentWidth - 10);
+                    pdf.text(opcaoLines, margin + 3, yPosition);
+                    yPosition += opcaoLines.length * 3.5;
+                  }
+                });
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'normal');
+              }
+            } else {
+              // Comportamento padrão para outros tipos
+              const itemText = `${checkbox}${obrigatorio} ${safeText(item.label, 'Item')}`;
+              const maxWidth = contentWidth - 6;
+              const textLines = pdf.splitTextToSize(itemText, maxWidth);
+              
+              pdf.text(textLines, margin + 3, yPosition);
+              yPosition += textLines.length * 3.5;
+            }
+            
+            if (item.obs) {
+              pdf.setFont('helvetica', 'italic');
+              pdf.setFontSize(8);
+              const obsLines = pdf.splitTextToSize(`    Obs: ${item.obs}`, contentWidth - 10);
+              pdf.text(obsLines, margin + 3, yPosition);
+              yPosition += obsLines.length * 3.5 + 1;
+              pdf.setFontSize(9);
+            }
+            
+            if (item.tipo === 'foto' && item.foto) {
+              // Verificar se é Base64 ou caminho de arquivo local
+              const isBase64 = item.foto.startsWith('data:image');
+              const isLocalFile = item.foto.startsWith('file://') || item.foto.includes('/var/mobile') || item.foto.includes('ImagePicker');
+              
+              if (isBase64) {
+                try {
+                  // Verificar se precisa de nova página
+                  if (yPosition > pageHeight - 80) {
+                    pdf.addPage();
+                    yPosition = margin;
+                  }
+                  
+                  pdf.setFont('helvetica', 'italic');
+                  pdf.setFontSize(9);
+                  pdf.text('    Foto anexada:', margin + 5, yPosition);
+                  yPosition += 5;
+                  
+                  // Adicionar a imagem
+                  const imgWidth = 80;
+                  const imgHeight = 60;
+                  const imgX = margin + 10;
+                  
+                  pdf.addImage(item.foto, 'JPEG', imgX, yPosition, imgWidth, imgHeight);
+                  yPosition += imgHeight + 5;
+                  
+                  pdf.setFontSize(10);
+                } catch (error) {
+                  console.error('Erro ao adicionar foto ao PDF:', error);
+                  pdf.setFont('helvetica', 'italic');
+                  pdf.setFontSize(9);
+                  pdf.text('    (Erro ao carregar foto)', margin + 5, yPosition);
+                  yPosition += 4;
+                  pdf.setFontSize(10);
+                }
+              } else if (isLocalFile) {
+                // Foto armazenada no dispositivo móvel
+                pdf.setFont('helvetica', 'italic');
+                pdf.setFontSize(9);
+                pdf.text('    Foto capturada pelo prestador (armazenada no dispositivo móvel)', margin + 5, yPosition);
+                yPosition += 4;
+                pdf.setFontSize(10);
+              } else {
+                // Outro tipo de caminho
+                pdf.setFont('helvetica', 'italic');
+                pdf.setFontSize(9);
+                pdf.text('    (Foto anexada - não disponível para impressão)', margin + 5, yPosition);
+                yPosition += 4;
+                pdf.setFontSize(10);
+              }
+            }
+          });
+          
+          yPosition += 2;
+        }
+        
+        if (checklistPrestador.etapa2.observacoesGerais) {
+          if (yPosition > pageHeight - 30) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Observações Gerais:', margin + 3, yPosition);
+          yPosition += 4;
+          pdf.setFont('helvetica', 'normal');
+          const obsLines = pdf.splitTextToSize(checklistPrestador.etapa2.observacoesGerais, contentWidth - 10);
+          pdf.text(obsLines, margin + 3, yPosition);
+          yPosition += obsLines.length * 4 + 2;
+        }
+        
+        if (checklistPrestador.etapa2.horaFinalizacao) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('[ ] Execução finalizada em:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(new Date(checklistPrestador.etapa2.horaFinalizacao).toLocaleString('pt-BR'), margin + 58, yPosition);
+          yPosition += 4.5;
+        }
+        
+        yPosition += 2;
+      }
+      
+      
+      // === APÓS A EXECUÇÃO ===
+      if (checklistPrestador.etapa3) {
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text('APÓS A EXECUÇÃO', margin, yPosition);
+        yPosition += 4.5;
+        
+        pdf.setFontSize(9);
+        
+        if (checklistPrestador.etapa3.duracaoTotal) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.text('[ ] Duração total do serviço:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(safeText(checklistPrestador.etapa3.duracaoTotal), margin + 58, yPosition);
+          yPosition += 4.5;
+        }
+        
+        if (checklistPrestador.etapa3.horaFinalizacaoTotal) {
+          pdf.setFont('helvetica', 'normal');
+          pdf.text('[ ] Serviço concluído em:', margin + 3, yPosition);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(new Date(checklistPrestador.etapa3.horaFinalizacaoTotal).toLocaleString('pt-BR'), margin + 53, yPosition);
+          yPosition += 4.5;
+        }
+        
+        const garantia = checklistPrestador.etapa3.garantia !== undefined ? 
+          (checklistPrestador.etapa3.garantia ? '[X] Sim  [ ] Não' : '[ ] Sim  [X] Não') : 
+          '[ ] Sim  [ ] Não';
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`[ ] Garantia aplicada: ${garantia}`, margin + 3, yPosition);
+        yPosition += 5;
+        
+        if (checklistPrestador.etapa3.observacoesRevisao) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Observações da Revisão:', margin + 3, yPosition);
+          yPosition += 4;
+          pdf.setFont('helvetica', 'normal');
+          const obsLines = pdf.splitTextToSize(checklistPrestador.etapa3.observacoesRevisao, contentWidth - 10);
+          pdf.text(obsLines, margin + 3, yPosition);
+          yPosition += obsLines.length * 4 + 4;
+        }
+        
+        // Assinatura do cliente
+        if (checklistPrestador.etapa3.assinaturaBase64) {
+          // Verificar se há espaço suficiente para assinatura completa (imagem + textos)
+          if (yPosition > pageHeight - 80) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          yPosition += 5;
+          addHorizontalLine(yPosition);
+          yPosition += 8;
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.text('ASSINATURA DO CLIENTE/SEGURADO', margin, yPosition);
+          yPosition += 8;
+          
+          try {
+            const imgWidth = 80;
+            const imgHeight = 35;
+            const imgX = margin + 10;
+            
+            pdf.addImage(checklistPrestador.etapa3.assinaturaBase64, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+            yPosition += imgHeight + 5;
+          } catch (error) {
+            console.error('Erro ao adicionar assinatura:', error);
+            yPosition += 35;
+          }
+          
+          // Linha horizontal para assinatura
+          pdf.setDrawColor(0, 0, 0);
+          pdf.setLineWidth(0.3);
+          pdf.line(margin, yPosition, margin + 80, yPosition);
+          yPosition += 5;
+          
+          // Texto "Assinatura: NÃO INFORMADO"
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          pdf.text('Assinatura: NÃO INFORMADO', margin, yPosition);
+          yPosition += 6;
+          
+          // Texto "Data: _____/_____/_____"
+          pdf.text('Data: _____/_____/_____', margin, yPosition);
+        } else {
+          // Espaço para assinatura manual
+          if (yPosition > pageHeight - 60) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          yPosition += 5;
+          addHorizontalLine(yPosition);
+          yPosition += 8;
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.text('ASSINATURA DO CLIENTE/SEGURADO', margin, yPosition);
+          yPosition += 25;
+          
+          // Linha horizontal para assinatura manual
+          pdf.setDrawColor(0, 0, 0);
+          pdf.setLineWidth(0.3);
+          pdf.line(margin, yPosition, margin + 80, yPosition);
+          yPosition += 5;
+          
+          // Texto "Assinatura: NÃO INFORMADO"
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          pdf.text('Assinatura: NÃO INFORMADO', margin, yPosition);
+          yPosition += 6;
+          
+          // Texto "Data: _____/_____/_____"
+          pdf.text('Data: _____/_____/_____', margin, yPosition);
+        }
+      }
+      
+      
+      // ========== RODAPÉ EM TODAS AS PÁGINAS ==========
+      pdf.setTextColor(0, 0, 0);
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        
+        const footerY = pageHeight - 25;
+        
+        // Linha superior
+        addHorizontalLine(footerY);
+        
+        // Texto do rodapé
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Documento gerado em ${new Date().toLocaleString('pt-BR')}`, margin, footerY + 5);
+        pdf.text(`Página ${i} de ${totalPages}`, pageWidth - margin, footerY + 5, { align: 'right' });
+        
+        // Observação importante
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text('Este documento é válido sem assinatura conforme legislação vigente', pageWidth / 2, footerY + 10, { align: 'center' });
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('IMPORTANTE: GUARDE ESTE DOCUMENTO PARA GARANTIA E REFERÊNCIA', pageWidth / 2, footerY + 15, { align: 'center' });
+      }
+      
+      // ========== SALVAR PDF ==========
+      const fileName = `OS_${detalhesOS.codigo}_${new Date().getTime()}.pdf`;
+      pdf.save(fileName);
+      
+      // Notificação de sucesso
+      await firebase.createNotification(companyCnpj, {
+        title: 'PDF Gerado',
+        message: `Documento oficial da OS #${detalhesOS.codigo} foi gerado com sucesso`,
+        type: 'info',
+        osId: detalhesOS.id,
+        osCodigo: detalhesOS.codigo,
+        userId: 'all',
+        createdBy: localStorage.getItem('userName') || 'Sistema'
+      });
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Verifique os dados e tente novamente.');
+    }
   };
 
   // Função para buscar endereço por CEP usando ViaCEP
@@ -296,6 +1132,7 @@ export default function OrdemServico() {
       }
 
       const novaOS = {
+        codigo: nova.codigo || gerarCodigoAleatorio(),
         cliente: nova.nomeCliente,
         telefone: nova.telefoneCliente,
         ...(nova.emailCliente ? { email: nova.emailCliente } : {}),
@@ -338,6 +1175,7 @@ export default function OrdemServico() {
       }
       
       setNova({
+        codigo: "",
         nomeCliente: "",
         telefoneCliente: "",
         emailCliente: "",
@@ -359,6 +1197,133 @@ export default function OrdemServico() {
     } catch (err) {
       console.error('Erro ao criar OS:', err);
       alert(`❌ Erro ao criar OS: ${err.message}`);
+    } finally {
+      setAtualizando(false);
+    }
+  }
+
+  // Função para abrir edição de OS
+  function abrirEdicaoOS(os) {
+    setEditandoOS(os);
+    setNova({
+      codigo: os.codigo || "",
+      nomeCliente: os.cliente || "",
+      telefoneCliente: os.telefone || "",
+      emailCliente: os.email || "",
+      endereco: os.endereco || "",
+      numero: os.numero || "",
+      cep: os.cep || "",
+      cidade: os.cidade || "",
+      estado: os.estado || "",
+      complemento: os.complemento || "",
+      latitude: os.latitude || "",
+      longitude: os.longitude || "",
+      prioridade: os.prioridade || "Média",
+      responsavel: os.responsavel || "",
+      descricao: os.descricao || ""
+    });
+    setShowForm(true);
+  }
+
+  // Função para atualizar OS
+  async function handleAtualizarOS(e) {
+    e.preventDefault();
+    if (!companyCnpj || !editandoOS) return;
+
+    setAtualizando(true);
+    try {
+      const osAtualizada = {
+        ...editandoOS,
+        codigo: nova.codigo,
+        cliente: nova.nomeCliente,
+        telefone: nova.telefoneCliente,
+        email: nova.emailCliente,
+        endereco: nova.endereco,
+        numero: nova.numero,
+        complemento: nova.complemento,
+        cep: nova.cep,
+        cidade: nova.cidade,
+        estado: nova.estado,
+        latitude: nova.latitude,
+        longitude: nova.longitude,
+        prioridade: nova.prioridade,
+        responsavel: nova.responsavel,
+        descricao: nova.descricao,
+        ultimaAtualizacao: new Date().toISOString()
+      };
+
+      await firebase.updateServiceOrder(companyCnpj, editandoOS.id, osAtualizada);
+      
+      setNova({
+        codigo: "",
+        nomeCliente: "",
+        telefoneCliente: "",
+        emailCliente: "",
+        endereco: "",
+        numero: "",
+        cep: "",
+        cidade: "",
+        estado: "",
+        complemento: "",
+        latitude: "",
+        longitude: "",
+        prioridade: "Média",
+        responsavel: "",
+        descricao: ""
+      });
+      setEditandoOS(null);
+      setShowForm(false);
+      await loadOrdens();
+      alert(`✅ Ordem de Serviço atualizada com sucesso!`);
+    } catch (err) {
+      console.error('Erro ao atualizar OS:', err);
+      alert(`❌ Erro ao atualizar OS: ${err.message}`);
+    } finally {
+      setAtualizando(false);
+    }
+  }
+
+  // Função para excluir OS
+  async function handleExcluirOS() {
+    if (!companyCnpj || !editandoOS) return;
+    
+    const confirmacao = window.confirm(
+      `⚠️ Tem certeza que deseja excluir a OS?\n\n` +
+      `Código: ${editandoOS.codigo}\n` +
+      `Cliente: ${editandoOS.cliente}\n\n` +
+      `Esta ação não pode ser desfeita!`
+    );
+    
+    if (!confirmacao) return;
+
+    setAtualizando(true);
+    try {
+      await firebase.deleteServiceOrder(companyCnpj, editandoOS.id);
+      
+      setNova({
+        codigo: "",
+        nomeCliente: "",
+        telefoneCliente: "",
+        emailCliente: "",
+        endereco: "",
+        numero: "",
+        cep: "",
+        cidade: "",
+        estado: "",
+        complemento: "",
+        latitude: "",
+        longitude: "",
+        prioridade: "Média",
+        responsavel: "",
+        descricao: ""
+      });
+      setEditandoOS(null);
+      setShowForm(false);
+      await loadOrdens();
+      alert(`✅ Ordem de Serviço excluída com sucesso!`);
+    } catch (err) {
+      console.error('Erro ao excluir OS:', err);
+      alert(`❌ Erro ao excluir OS: ${err.message}`);
     } finally {
       setAtualizando(false);
     }
@@ -481,11 +1446,31 @@ export default function OrdemServico() {
     const matchPesquisa = pesquisa 
       ? os.cliente.toLowerCase().includes(pesquisa.toLowerCase()) || 
         os.codigo.toLowerCase().includes(pesquisa.toLowerCase()) ||
-        os.responsavel.toLowerCase().includes(pesquisa.toLowerCase())
+        (os.responsavel && os.responsavel.toLowerCase().includes(pesquisa.toLowerCase()))
       : true;
     
     return matchStatus && matchPrioridade && matchPesquisa;
+  }).sort((a, b) => {
+    // Concluídas vão para o final
+    if (a.status === "Concluída" && b.status !== "Concluída") return 1;
+    if (a.status !== "Concluída" && b.status === "Concluída") return -1;
+    
+    // Entre não concluídas: mais RECENTES primeiro (menor tempo)
+    const dataA = new Date(a.ultimaAtualizacao || a.abertura);
+    const dataB = new Date(b.ultimaAtualizacao || b.abertura);
+    return dataB - dataA; // Invertido: mais recentes primeiro
   });
+
+  // Paginação
+  const totalPaginas = Math.ceil(ordensFiltradas.length / itensPorPagina);
+  const indiceInicio = (paginaAtual - 1) * itensPorPagina;
+  const indiceFim = indiceInicio + itensPorPagina;
+  const ordensExibidas = ordensFiltradas.slice(indiceInicio, indiceFim);
+
+  // Resetar para página 1 quando filtros mudarem
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [filtroStatus, filtroPrioridade, pesquisa]);
 
   // Contadores para cards
   const total = ordens.length;
@@ -546,11 +1531,11 @@ export default function OrdemServico() {
     formBg: "#1f2937",
     inputBg: "#374151",
     inputText: "#f9fafb",
-    buttonBg: "#0ea5e9",
+    buttonBg: "#2C30D5",
     buttonText: "#f9fafb",
     cancelButtonBg: "#4b5563",
     cancelButtonText: "#f9fafb",
-    highlight: "#0ea5e9"
+    highlight: "#32DAF3"
   } : {
     bg: "#f8fafc",
     cardBg: "#ffffff",
@@ -564,11 +1549,11 @@ export default function OrdemServico() {
     formBg: "#f0f9ff",
     inputBg: "#ffffff",
     inputText: "#0f172a",
-    buttonBg: "#0ea5e9",
+    buttonBg: "#2C30D5",
     buttonText: "#ffffff",
     cancelButtonBg: "#f1f5f9",
     cancelButtonText: "#64748b",
-    highlight: "#0ea5e9"
+    highlight: "#32DAF3"
   };
 
   return (
@@ -939,11 +1924,40 @@ export default function OrdemServico() {
                 alignItems: "center",
                 gap: "8px"
               }}>
-                <FiPlusCircle size={20} color={theme.highlight} />
-                Nova Ordem de Serviço
+                {editandoOS ? (
+                  <>
+                    <FiEdit3 size={20} color={theme.highlight} />
+                    Editar Ordem de Serviço
+                  </>
+                ) : (
+                  <>
+                    <FiPlusCircle size={20} color={theme.highlight} />
+                    Nova Ordem de Serviço
+                  </>
+                )}
               </h3>
               <button 
-                onClick={() => setShowForm(false)} 
+                onClick={() => {
+                  setShowForm(false);
+                  setEditandoOS(null);
+                  setNova({
+                    codigo: "",
+                    nomeCliente: "",
+                    telefoneCliente: "",
+                    emailCliente: "",
+                    endereco: "",
+                    numero: "",
+                    cep: "",
+                    cidade: "",
+                    estado: "",
+                    complemento: "",
+                    latitude: "",
+                    longitude: "",
+                    prioridade: "Média",
+                    responsavel: "",
+                    descricao: ""
+                  });
+                }} 
                 style={{
                   background: "transparent",
                   border: "none",
@@ -965,7 +1979,60 @@ export default function OrdemServico() {
               </button>
             </div>
             
-            <form onSubmit={handleAddOS} style={{ display: "grid", gap: "20px" }}>
+            <form onSubmit={editandoOS ? handleAtualizarOS : handleAddOS} style={{ display: "grid", gap: "20px" }}>
+              {/* Campo de Código */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ 
+                  color: theme.subtext, 
+                  fontSize: "0.9rem", 
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}>
+                  🔢 Código da OS
+                </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    type="text"
+                    placeholder="OS-2512345"
+                    value={nova.codigo}
+                    onChange={e => setNova(prev => ({ ...prev, codigo: e.target.value }))}
+                    style={{
+                      flex: 1,
+                      background: theme.inputBg,
+                      color: theme.inputText,
+                      border: `1px solid ${theme.inputBorder}`,
+                      borderRadius: "8px",
+                      padding: "10px 12px",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                      transition: "all 0.2s ease"
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNova(prev => ({ ...prev, codigo: gerarCodigoAleatorio() }))}
+                    style={{
+                      padding: "10px 16px",
+                      background: "#2C30D5",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "0.85rem",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.2s ease"
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = "#889DD3"}
+                    onMouseOut={e => e.currentTarget.style.background = "#2C30D5"}
+                  >
+                    🎲 Gerar
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <label style={{ 
@@ -1468,28 +2535,72 @@ export default function OrdemServico() {
                 />
               </div>
               
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-                <motion.button 
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  type="button" 
-                  onClick={() => setShowForm(false)}
-                  style={{
-                    background: theme.cancelButtonBg,
-                    color: theme.cancelButtonText,
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "12px 20px",
-                    fontWeight: 500,
-                    fontSize: "0.95rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}
-                >
-                  Cancelar
-                </motion.button>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                {editandoOS && (
+                  <motion.button 
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="button" 
+                    onClick={handleExcluirOS}
+                    style={{
+                      background: "#fee2e2",
+                      color: "#dc2626",
+                      border: "1px solid #fca5a5",
+                      borderRadius: "8px",
+                      padding: "12px 20px",
+                      fontWeight: 600,
+                      fontSize: "0.95rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px"
+                    }}
+                  >
+                    🗑️ Excluir OS
+                  </motion.button>
+                )}
+                <div style={{ display: "flex", gap: "12px", marginLeft: "auto" }}>
+                  <motion.button 
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="button" 
+                    onClick={() => {
+                      setShowForm(false);
+                      setEditandoOS(null);
+                      setNova({
+                        codigo: "",
+                        nomeCliente: "",
+                        telefoneCliente: "",
+                        emailCliente: "",
+                        endereco: "",
+                        numero: "",
+                        cep: "",
+                        cidade: "",
+                        estado: "",
+                        complemento: "",
+                        latitude: "",
+                        longitude: "",
+                        prioridade: "Média",
+                        responsavel: "",
+                        descricao: ""
+                      });
+                    }}
+                    style={{
+                      background: theme.cancelButtonBg,
+                      color: theme.cancelButtonText,
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "12px 20px",
+                      fontWeight: 500,
+                      fontSize: "0.95rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px"
+                    }}
+                  >
+                    Cancelar
+                  </motion.button>
                 <motion.button 
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
@@ -1510,8 +2621,9 @@ export default function OrdemServico() {
                   }}
                 >
                   <FiCheck size={18} />
-                  Cadastrar OS
+                  {editandoOS ? "Atualizar OS" : "Cadastrar OS"}
                 </motion.button>
+                </div>
               </div>
             </form>
           </motion.div>
@@ -1527,11 +2639,11 @@ export default function OrdemServico() {
         marginBottom: "24px",
         border: `1px solid ${theme.border}`
       }}>
-        <div style={{ overflowX: "auto" }}>
           <table style={{
             width: "100%",
             borderCollapse: "collapse",
-            fontSize: "0.95rem"
+            fontSize: "clamp(0.75rem, 1vw, 0.9rem)",
+            tableLayout: "fixed"
           }}>
             <thead>
               <tr style={{ 
@@ -1539,82 +2651,91 @@ export default function OrdemServico() {
                 borderBottom: `1px solid ${theme.border}` 
               }}>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "8%"
                 }}>
                   Código
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "14%"
                 }}>
                   Cliente
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "11%"
                 }}>
                   Telefone
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "15%"
                 }}>
                   Endereço
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "11%"
                 }}>
                   Status
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "8%"
                 }}>
                   Prioridade
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "left", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "11%"
                 }}>
                   Responsável
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(8px, 1.5vw, 16px)", 
                   textAlign: "center", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "6%"
                 }}>
                   Tempo
                 </th>
                 <th style={{ 
-                  padding: "16px", 
+                  padding: "clamp(4px, 1vw, 12px)", 
                   textAlign: "center", 
                   color: theme.text, 
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  width: "11%"
                 }}>
                   Ações
                 </th>
               </tr>
             </thead>
             <tbody>
-              {ordensFiltradas.length > 0 ? (
-                ordensFiltradas.map((os, i) => {
+              {ordensExibidas.length > 0 ? (
+                ordensExibidas.map((os, i) => {
                   const statusInfo = getStatusInfo(os.status);
                   const prioridadeInfo = getPrioridadeInfo(os.prioridade);
                   
@@ -1632,22 +2753,22 @@ export default function OrdemServico() {
                       onMouseOver={(e) => e.currentTarget.style.backgroundColor = darkMode ? "#2d3748" : "#f0f9ff"}
                       onMouseOut={(e) => e.currentTarget.style.backgroundColor = i % 2 === 0 ? theme.tableRowBg : theme.tableRowAltBg}
                     >
-                      <td style={{ padding: "16px", color: theme.highlight, fontWeight: 600 }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)", color: theme.highlight, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {os.codigo}
                       </td>
-                      <td style={{ padding: "16px", color: theme.text, fontWeight: 500 }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)", color: theme.text, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {os.cliente}
                       </td>
-                      <td style={{ padding: "16px", color: theme.text }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)", color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <FiPhone size={14} color={theme.subtext} />
                           {os.telefone || '-'}
                         </div>
                       </td>
-                      <td style={{ padding: "16px", color: theme.text, fontSize: "0.9rem" }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)", color: theme.text, fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {os.endereco && os.numero ? `${os.endereco}, ${os.numero}` : '-'}
                       </td>
-                      <td style={{ padding: "16px" }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)" }}>
                         <div style={{
                           display: "flex",
                           alignItems: "center",
@@ -1656,64 +2777,73 @@ export default function OrdemServico() {
                           <span style={{
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: "6px",
-                            padding: "6px 10px",
+                            gap: "4px",
+                            padding: "4px 8px",
                             borderRadius: "6px",
-                            fontSize: "0.85rem",
+                            fontSize: "clamp(0.7rem, 0.9vw, 0.85rem)",
                             fontWeight: 600,
                             color: statusInfo.cor,
-                            backgroundColor: `${statusInfo.cor}15`
+                            backgroundColor: `${statusInfo.cor}15`,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap"
                           }}>
                             {statusInfo.icon}
                             {os.status}
                           </span>
                         </div>
                       </td>
-                      <td style={{ padding: "16px" }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)" }}>
                         <span style={{
                           display: "inline-block",
-                          padding: "6px 10px",
+                          padding: "4px 8px",
                           borderRadius: "6px",
-                          fontSize: "0.85rem",
+                          fontSize: "clamp(0.7rem, 0.9vw, 0.85rem)",
                           fontWeight: 600,
                           color: prioridadeInfo.cor,
-                          backgroundColor: `${prioridadeInfo.cor}15`
+                          backgroundColor: `${prioridadeInfo.cor}15`,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap"
                         }}>
                           {os.prioridade}
                         </span>
                       </td>
-                      <td style={{ padding: "16px", color: theme.text, fontWeight: 500 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <td style={{ padding: "clamp(8px, 1.5vw, 16px)", color: theme.text, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <div style={{
-                            width: "28px",
-                            height: "28px",
+                            width: "clamp(24px, 3vw, 28px)",
+                            height: "clamp(24px, 3vw, 28px)",
                             borderRadius: "50%",
                             background: theme.highlight,
                             color: "white",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: "0.75rem",
+                            fontSize: "clamp(0.65rem, 0.8vw, 0.75rem)",
                             fontWeight: 600
                           }}>
-                            {os.responsavel.split(' ').map(name => name[0]).join('')}
+                            {os.responsavel ? os.responsavel.split(' ').map(name => name[0]).join('') : 'NA'}
                           </div>
-                          {os.responsavel}
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {os.responsavel || 'Não atribuído'}
+                          </span>
                         </div>
                       </td>
                       <td style={{ 
-                        padding: "16px", 
+                        padding: "clamp(8px, 1.5vw, 16px)", 
                         textAlign: "center",
-                        color: theme.text
+                        color: theme.text,
+                        fontSize: "clamp(0.7rem, 0.9vw, 0.85rem)"
                       }}>
-                        <div title={formatDateTime(os.ultimaAtualizacao)}>
+                        <div title={formatDateTime(os.ultimaAtualizacao)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {getElapsedTime(os.ultimaAtualizacao)}
                           {os.alerta && (
                             <span 
                               title="Alerta pendente" 
                               style={{ 
                                 color: "#f59e0b", 
-                                marginLeft: "6px",
+                                marginLeft: "4px",
                                 cursor: "help" 
                               }}
                             >
@@ -1723,69 +2853,76 @@ export default function OrdemServico() {
                         </div>
                       </td>
                       <td style={{ 
-                        padding: "16px", 
+                        padding: "clamp(4px, 1vw, 12px)", 
                         textAlign: "center"
                       }}>
-                        <div style={{ display: "flex", justifyContent: "center", gap: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "center", gap: "2px", flexWrap: "nowrap" }}>
                           <motion.button 
-                            whileHover={{ scale: 1.15 }}
+                            whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.95 }}
                             title="Editar" 
+                            onClick={() => abrirEdicaoOS(os)}
                             style={{
                               background: `${theme.highlight}15`,
                               border: "none",
-                              borderRadius: "8px",
-                              padding: "8px",
+                              borderRadius: "4px",
+                              padding: "clamp(3px, 0.8vw, 6px)",
                               color: theme.highlight,
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center"
+                              justifyContent: "center",
+                              minWidth: "24px",
+                              minHeight: "24px"
                             }}
                           >
-                            <FiEdit3 size={16} />
+                            <FiEdit3 size={12} />
                           </motion.button>
                           
                           {os.status !== "Concluída" && (
                             <motion.button 
-                              whileHover={{ scale: 1.15 }}
+                              whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.95 }}
                               title="Concluir" 
                               onClick={() => changeStatus(os.codigo, "Concluída")}
                               style={{
-                                background: "#10b98115",
+                                background: "#11A56115",
                                 border: "none",
-                                borderRadius: "8px",
-                                padding: "8px",
-                                color: "#10b981",
+                                borderRadius: "4px",
+                                padding: "clamp(3px, 0.8vw, 6px)",
+                                color: "#11A561",
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center"
+                                justifyContent: "center",
+                                minWidth: "24px",
+                                minHeight: "24px"
                               }}
                             >
-                              <FiCheckCircle size={16} />
+                              <FiCheckCircle size={12} />
                             </motion.button>
                           )}
                           
                           <motion.button 
-                            whileHover={{ scale: 1.15 }}
+                            whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.95 }}
                             title="Detalhes" 
                             onClick={() => setDetalhesOS(os)}
                             style={{
                               background: `${theme.subtext}15`,
                               border: "none",
-                              borderRadius: "8px",
-                              padding: "8px",
+                              borderRadius: "4px",
+                              padding: "clamp(3px, 0.8vw, 6px)",
                               color: theme.subtext,
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center"
+                              justifyContent: "center",
+                              minWidth: "24px",
+                              minHeight: "24px"
                             }}
                           >
-                            <FiEye size={16} />
+                            <FiEye size={12} />
                           </motion.button>
                         </div>
                       </td>
@@ -1814,7 +2951,6 @@ export default function OrdemServico() {
               )}
             </tbody>
           </table>
-        </div>
       </div>
 
       {/* Modal de detalhes */}
@@ -1846,13 +2982,15 @@ export default function OrdemServico() {
               style={{
                 background: theme.cardBg,
                 borderRadius: "12px",
-                padding: "24px",
+                padding: "16px",
                 width: "100%",
                 maxWidth: "600px",
-                maxHeight: "80vh",
+                maxHeight: "95vh",
                 overflowY: "auto",
                 boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)",
-                border: `1px solid ${theme.border}`
+                border: `1px solid ${theme.border}`,
+                display: "flex",
+                flexDirection: "column"
               }}
               onClick={e => e.stopPropagation()}
             >
@@ -1860,27 +2998,23 @@ export default function OrdemServico() {
                 display: "flex", 
                 justifyContent: "space-between", 
                 alignItems: "flex-start", 
-                marginBottom: "20px" 
+                marginBottom: "12px" 
               }}>
                 <div>
                   <h3 style={{ 
                     color: theme.text, 
                     fontWeight: 700, 
-                    fontSize: "1.4rem", 
-                    margin: "0 0 4px 0" 
+                    fontSize: "1.2rem", 
+                    margin: 0
                   }}>
-                    Ordem de Serviço {detalhesOS.codigo}
+                    OS {detalhesOS.codigo}
                   </h3>
-                  <p style={{ 
-                    color: theme.subtext, 
-                    margin: 0, 
-                    fontSize: "0.95rem" 
-                  }}>
-                    Detalhes completos da ordem
-                  </p>
                 </div>
                 <button 
-                  onClick={() => setDetalhesOS(null)} 
+                  onClick={() => {
+                    setDetalhesOS(null);
+                    setAbaDetalhesOS('info');
+                  }} 
                   style={{
                     background: theme.cancelButtonBg,
                     border: "none",
@@ -1898,12 +3032,91 @@ export default function OrdemServico() {
                   ×
                 </button>
               </div>
-              
+
+              {/* Tabs de navegação */}
+              <div style={{
+                display: "flex",
+                gap: "4px",
+                marginBottom: "12px",
+                borderBottom: `2px solid ${theme.border}`,
+                paddingBottom: "0"
+              }}>
+                <button
+                  onClick={() => setAbaDetalhesOS('info')}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    background: abaDetalhesOS === 'info' ? theme.highlight : 'transparent',
+                    color: abaDetalhesOS === 'info' ? 'white' : theme.text,
+                    border: "none",
+                    borderRadius: "8px 8px 0 0",
+                    fontWeight: abaDetalhesOS === 'info' ? 700 : 500,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <FiInfo size={14} />
+                  Info
+                </button>
+                <button
+                  onClick={() => setAbaDetalhesOS('chat')}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    background: abaDetalhesOS === 'chat' ? theme.highlight : 'transparent',
+                    color: abaDetalhesOS === 'chat' ? 'white' : theme.text,
+                    border: "none",
+                    borderRadius: "8px 8px 0 0",
+                    fontWeight: abaDetalhesOS === 'chat' ? 700 : 500,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <FiMessageSquare size={14} />
+                  Chat
+                </button>
+                <button
+                  onClick={() => setAbaDetalhesOS('checklist')}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    background: abaDetalhesOS === 'checklist' ? theme.highlight : 'transparent',
+                    color: abaDetalhesOS === 'checklist' ? 'white' : theme.text,
+                    border: "none",
+                    borderRadius: "8px 8px 0 0",
+                    fontWeight: abaDetalhesOS === 'checklist' ? 700 : 500,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <FiCheckSquare size={14} />
+                  Checklist
+                </button>
+              </div>
+
+              {/* Conteúdo da aba Info */}
+              {abaDetalhesOS === 'info' && (
+                <div style={{ flex: 1, overflowY: "auto", paddingRight: "4px" }}>
               <div style={{ 
                 display: "grid", 
                 gridTemplateColumns: "1fr 1fr", 
-                gap: "20px", 
-                marginBottom: "24px" 
+                gap: "12px", 
+                marginBottom: "16px" 
               }}>
                 <div>
                   <p style={{ 
@@ -1931,43 +3144,18 @@ export default function OrdemServico() {
                   }}>
                     Telefone
                   </p>
-                  <div style={{
+                  <p style={{ 
+                    color: theme.text, 
+                    fontWeight: 500, 
+                    fontSize: "1rem", 
+                    margin: 0,
                     display: "flex",
-                    gap: "8px",
-                    alignItems: "center"
+                    alignItems: "center",
+                    gap: "6px"
                   }}>
-                    <div style={{ 
-                      color: theme.text, 
-                      fontWeight: 500, 
-                      fontSize: "1rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      flex: 1
-                    }}>
-                      <FiPhone size={16} />
-                      {detalhesOS.telefone || '-'}
-                    </div>
-                    {detalhesOS.telefone && (
-                      <button
-                        onClick={() => handleEnviarWhatsApp(detalhesOS.cliente, detalhesOS.telefone, detalhesOS.codigo)}
-                        style={{
-                          padding: "6px 12px",
-                          backgroundColor: "#25d366",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "6px",
-                          fontSize: "0.8rem",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap"
-                        }}
-                        title="Enviar mensagem via WhatsApp"
-                      >
-                        📱 WhatsApp
-                      </button>
-                    )}
-                  </div>
+                    <FiPhone size={16} />
+                    {detalhesOS.telefone || '-'}
+                  </p>
                 </div>
 
                 <div>
@@ -2021,9 +3209,9 @@ export default function OrdemServico() {
                       fontSize: "0.75rem",
                       fontWeight: 600
                     }}>
-                      {detalhesOS.responsavel.split(' ').map(name => name[0]).join('')}
+                      {detalhesOS.responsavel ? detalhesOS.responsavel.split(' ').map(name => name[0]).join('') : 'NA'}
                     </div>
-                    {detalhesOS.responsavel}
+                    {detalhesOS.responsavel || 'Não atribuído'}
                   </p>
                 </div>
               </div>
@@ -2231,15 +3419,40 @@ export default function OrdemServico() {
                   {detalhesOS.descricao || "Sem descrição disponível."}
                 </div>
               </div>
+                </div>
+              )}
 
-              <div style={{ marginBottom: "24px" }}>
-                <p style={{ 
-                  color: theme.subtext, 
-                  fontSize: "0.85rem", 
-                  margin: "0 0 12px 0" 
+              {/* Conteúdo da aba Chat */}
+              {abaDetalhesOS === 'chat' && (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "12px"
                 }}>
-                  💬 Comunicação com Cliente
-                </p>
+                  <p style={{ 
+                    color: theme.subtext, 
+                    fontSize: "0.85rem", 
+                    margin: 0
+                  }}>
+                    💬 Comunicação com Prestador
+                  </p>
+                  {mensagensNaoLidas[detalhesOS.codigo] > 0 && (
+                    <span style={{
+                      backgroundColor: "#ef4444",
+                      color: "white",
+                      fontSize: "0.7rem",
+                      fontWeight: "700",
+                      padding: "2px 8px",
+                      borderRadius: "12px",
+                      minWidth: "20px",
+                      textAlign: "center"
+                    }}>
+                      {mensagensNaoLidas[detalhesOS.codigo]}
+                    </span>
+                  )}
+                </div>
                 <div style={{
                   background: `${theme.bg}`,
                   border: `1px solid ${theme.border}`,
@@ -2247,65 +3460,158 @@ export default function OrdemServico() {
                   overflow: "hidden",
                   display: "flex",
                   flexDirection: "column",
-                  height: "250px"
+                  height: "calc(95vh - 320px)",
+                  minHeight: "200px"
                 }}>
                   {/* Área de mensagens */}
-                  <div style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    padding: "12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px"
-                  }}>
-                    {(mensagensCliente[detalhesOS.codigo] || []).length === 0 ? (
-                      <div style={{
-                        textAlign: "center",
-                        color: theme.subtext,
-                        fontSize: "0.85rem",
-                        padding: "20px",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        height: "100%"
-                      }}>
-                        📱 Clique em <strong>WhatsApp</strong> acima para iniciar conversa com o cliente<br/>
-                        ou envie uma mensagem aqui
-                      </div>
-                    ) : (
-                      (mensagensCliente[detalhesOS.codigo] || []).map((msg) => (
+                  <div 
+                    ref={chatScrollRef}
+                    style={{
+                      flex: 1,
+                      overflowY: "auto",
+                      padding: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                      width: "100%"
+                    }}>
+                    {(() => {
+                      const msgs = mensagensCliente[detalhesOS.codigo] || [];
+                      console.log('🔍 RENDER - Total mensagens:', msgs.length);
+                      console.log('📋 Estado mensagensCliente:', mensagensCliente);
+                      console.log('🔑 Código OS:', detalhesOS.codigo);
+                      
+                      if (msgs.length === 0) {
+                        console.log('⚠️ Mostrando estado vazio');
+                        return (
+                          <div style={{
+                            textAlign: "center",
+                            color: theme.subtext,
+                            fontSize: "0.85rem",
+                            padding: "20px",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%"
+                          }}>
+                            📬 Envie uma mensagem para iniciar a conversa com o prestador
+                          </div>
+                        );
+                      }
+                      
+                      console.log('✅ Renderizando', msgs.length, 'mensagens');
+                      return msgs.map((msg, index) => {
+                        console.log(`💬 Mensagem ${index}:`, msg);
+                        return (
                         <div
                           key={msg.id}
                           style={{
+                            width: "100%",
                             display: "flex",
                             justifyContent: msg.enviado ? "flex-end" : "flex-start",
-                            marginBottom: "4px"
+                            alignItems: "flex-start",
+                            gap: "8px",
+                            clear: "both"
                           }}
                         >
+                          {/* Avatar do Prestador à esquerda */}
+                          {!msg.enviado && (
+                            <div style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "50%",
+                              backgroundColor: "#11A561", // Verde para prestador
+                              color: "white",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "0.75rem",
+                              fontWeight: "700",
+                              flexShrink: 0
+                            }}>
+                              {(msg.remetente || "P")[0].toUpperCase()}
+                            </div>
+                          )}
+                          
+                          {/* Balão da mensagem */}
                           <div
                             style={{
                               maxWidth: "70%",
-                              padding: "8px 12px",
-                              borderRadius: "8px",
-                              backgroundColor: msg.enviado ? "#dcfce7" : "#f0f0f0",
-                              color: "#000",
+                              padding: "10px 14px",
+                              borderRadius: msg.enviado ? "12px 12px 0 12px" : "12px 12px 12px 0", // Ponta do balão
+                              backgroundColor: msg.enviado ? "#2C30D5" : "#dcfce7", // Base azul, Prestador verde claro
+                              color: msg.enviado ? "#ffffff" : "#000",
                               fontSize: "0.85rem",
-                              wordBreak: "break-word"
+                              wordBreak: "break-word",
+                              boxShadow: "0 1px 2px rgba(0,0,0,0.1)"
                             }}
                           >
-                            <div>{msg.texto}</div>
+                            {/* Nome do remetente */}
                             <div style={{
                               fontSize: "0.7rem",
-                              opacity: 0.6,
-                              marginTop: "4px"
+                              fontWeight: "700",
+                              color: msg.enviado ? "#ffffff" : "#11A561",
+                              marginBottom: "4px",
+                              opacity: 0.9
+                            }}>
+                              {msg.enviado ? (msg.remetente || "Você") : (msg.remetente || "Prestador")}
+                            </div>
+                            
+                            {/* Imagem se houver */}
+                            {msg.arquivo && msg.tipoArquivo === 'imagem' && (
+                              <img 
+                                src={msg.arquivo} 
+                                alt="Imagem" 
+                                style={{
+                                  maxWidth: "100%",
+                                  borderRadius: "8px",
+                                  marginBottom: msg.texto ? "8px" : 0
+                                }}
+                              />
+                            )}
+                            
+                            {/* Texto da mensagem */}
+                            {msg.texto && <div style={{ lineHeight: "1.4" }}>{msg.texto}</div>}
+                            
+                            {/* Hora e status */}
+                            <div style={{
+                              fontSize: "0.65rem",
+                              opacity: 0.7,
+                              marginTop: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "flex-end",
+                              gap: "4px"
                             }}>
                               {msg.data}
+                              {msg.enviado && (
+                                <span style={{ color: msg.lida ? "#a7f3d0" : "rgba(255,255,255,0.6)" }}>✓✓</span>
+                              )}
                             </div>
                           </div>
+                          
+                          {/* Avatar da Base à direita */}
+                          {msg.enviado && (
+                            <div style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "50%",
+                              backgroundColor: "#889DD3", // Azul secundário para base
+                              color: "white",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "0.75rem",
+                              fontWeight: "700",
+                              flexShrink: 0
+                            }}>
+                              {(msg.remetente || currentUserName || "B")[0].toUpperCase()}
+                            </div>
+                          )}
                         </div>
-                      ))
-                    )}
+                      )});
+                    })()}
                   </div>
                   
                   {/* Área de entrada */}
@@ -2316,8 +3622,37 @@ export default function OrdemServico() {
                     gap: "8px"
                   }}>
                     <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          handleEnviarMensagemCliente(detalhesOS.codigo, inputMensagem[detalhesOS.codigo] || '', file);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: theme.inputBg || theme.bg,
+                        color: theme.text,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                      title="Anexar imagem"
+                    >
+                      <FiImage size={18} />
+                    </button>
+                    <input
                       type="text"
-                      placeholder="Mensagem para o cliente..."
+                      placeholder="Mensagem para o prestador..."
                       value={inputMensagem[detalhesOS.codigo] || ''}
                       onChange={(e) => setInputMensagem(prev => ({
                         ...prev,
@@ -2330,8 +3665,8 @@ export default function OrdemServico() {
                       }}
                       style={{
                         flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: "6px",
+                        padding: "10px 14px",
+                        borderRadius: "8px",
                         border: `1px solid ${theme.border}`,
                         backgroundColor: theme.inputBg || theme.bg,
                         color: theme.text,
@@ -2342,29 +3677,627 @@ export default function OrdemServico() {
                       onClick={() => {
                         handleEnviarMensagemCliente(detalhesOS.codigo, inputMensagem[detalhesOS.codigo]);
                       }}
+                      disabled={!inputMensagem[detalhesOS.codigo]?.trim()}
                       style={{
-                        padding: "8px 16px",
-                        backgroundColor: "#25d366",
+                        padding: "10px 20px",
+                        backgroundColor: inputMensagem[detalhesOS.codigo]?.trim() ? "#25d366" : "#9ca3af",
                         color: "white",
                         border: "none",
-                        borderRadius: "6px",
+                        borderRadius: "8px",
                         fontSize: "0.85rem",
                         fontWeight: "600",
-                        cursor: "pointer"
+                        cursor: inputMensagem[detalhesOS.codigo]?.trim() ? "pointer" : "not-allowed",
+                        transition: "all 0.2s"
                       }}
                     >
                       Enviar
                     </button>
                   </div>
                 </div>
-              </div>
+                </div>
+              )}
+
+              {/* Conteúdo da aba Checklist */}
+              {abaDetalhesOS === 'checklist' && (
+                <div style={{ flex: 1, overflowY: "auto", paddingRight: "4px" }}>
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "12px"
+                  }}>
+                    <p style={{ 
+                      color: theme.subtext, 
+                      fontSize: "0.85rem", 
+                      margin: 0
+                    }}>
+                      ✅ Checklist do Prestador
+                    </p>
+                    {checklistPrestador && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleGerarPDF}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "8px 16px",
+                          backgroundColor: "#ef4444",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          fontSize: "0.85rem",
+                          fontWeight: "600",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <FiFileText size={16} />
+                        Baixar PDF
+                      </motion.button>
+                    )}
+                  </div>
+                  <div style={{
+                    background: `${theme.bg}`,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "8px",
+                    padding: "12px",
+                    height: "calc(95vh - 320px)",
+                    minHeight: "200px",
+                    overflowY: "auto"
+                  }}>
+                    {checklistPrestador ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        
+                        {/* Estado */}
+                        {checklistPrestador.estado && (
+                          <div style={{
+                            background: theme.cardBg,
+                            border: `1px solid ${theme.border}`,
+                            borderRadius: "8px",
+                            padding: "16px"
+                          }}>
+                            <h4 style={{ margin: "0 0 8px 0", color: theme.text, fontSize: "1rem" }}>
+                              📍 Localização
+                            </h4>
+                            <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                              <strong>Estado:</strong> {checklistPrestador.estado}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Etapa 1 - Reconhecimento */}
+                        {checklistPrestador.etapa1 && (
+                          <div style={{
+                            background: theme.cardBg,
+                            border: `1px solid ${theme.border}`,
+                            borderRadius: "8px",
+                            padding: "16px"
+                          }}>
+                            <h4 style={{ margin: "0 0 12px 0", color: theme.text, fontSize: "1rem" }}>
+                              🔍 Etapa 1 - Reconhecimento
+                            </h4>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                              {checklistPrestador.etapa1.dadosConfirmados !== undefined && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Dados Confirmados:</strong> {checklistPrestador.etapa1.dadosConfirmados ? '✅ Sim' : '❌ Não'}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa1.horaReconhecimento && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Hora do Reconhecimento:</strong> {new Date(checklistPrestador.etapa1.horaReconhecimento).toLocaleString('pt-BR')}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa1.completedAt && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Completado em:</strong> {new Date(checklistPrestador.etapa1.completedAt).toLocaleString('pt-BR')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Etapa 2 - Execução */}
+                        {checklistPrestador.etapa2 && (
+                          <div style={{
+                            background: theme.cardBg,
+                            border: `1px solid ${theme.border}`,
+                            borderRadius: "8px",
+                            padding: "16px"
+                          }}>
+                            <h4 style={{ margin: "0 0 12px 0", color: theme.text, fontSize: "1rem" }}>
+                              🛠️ Etapa 2 - Execução
+                            </h4>
+                            
+                            {/* Checklist Items */}
+                            {checklistPrestador.etapa2.checklist && checklistPrestador.etapa2.checklist.length > 0 && (
+                              <div style={{ marginBottom: "16px" }}>
+                                <h5 style={{ margin: "0 0 16px 0", color: theme.text, fontSize: "0.95rem" }}>
+                                  📋 Itens do Checklist
+                                </h5>
+                                
+                                {/* Resumo de Progresso */}
+                                {(() => {
+                                  const totalItens = checklistPrestador.etapa2.checklist.length;
+                                  const itensCompletos = checklistPrestador.etapa2.checklist.filter(item => item.checked).length;
+                                  const itensObrigatorios = checklistPrestador.etapa2.checklist.filter(item => item.obrigatorio).length;
+                                  const obrigatoriosCompletos = checklistPrestador.etapa2.checklist.filter(item => item.obrigatorio && item.checked).length;
+                                  const percentualCompleto = Math.round((itensCompletos / totalItens) * 100);
+                                  
+                                  return (
+                                    <div style={{
+                                      padding: "16px",
+                                      background: "linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)",
+                                      border: "2px solid #32DAF3",
+                                      borderRadius: "10px",
+                                      marginBottom: "20px",
+                                      boxShadow: "0 2px 8px rgba(50, 218, 243, 0.15)"
+                                    }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                                        <div>
+                                          <h6 style={{ margin: "0 0 4px 0", color: "#0c4a6e", fontSize: "0.85rem", fontWeight: "700" }}>
+                                            📊 PROGRESSO DO CHECKLIST
+                                          </h6>
+                                          <p style={{ margin: 0, color: "#0369a1", fontSize: "0.8rem" }}>
+                                            {itensCompletos} de {totalItens} itens concluídos
+                                          </p>
+                                        </div>
+                                        <div style={{
+                                          background: percentualCompleto === 100 ? "#11A561" : "#32DAF3",
+                                          color: "white",
+                                          padding: "8px 16px",
+                                          borderRadius: "20px",
+                                          fontSize: "1.1rem",
+                                          fontWeight: "700"
+                                        }}>
+                                          {percentualCompleto}%
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Barra de progresso */}
+                                      <div style={{
+                                        width: "100%",
+                                        height: "12px",
+                                        background: "#e0f2fe",
+                                        borderRadius: "6px",
+                                        overflow: "hidden",
+                                        marginBottom: "12px"
+                                      }}>
+                                        <div style={{
+                                          width: `${percentualCompleto}%`,
+                                          height: "100%",
+                                          background: percentualCompleto === 100 
+                                            ? "linear-gradient(90deg, #11A561 0%, #0d8f51 100%)"
+                                            : "linear-gradient(90deg, #32DAF3 0%, #2C30D5 100%)",
+                                          transition: "width 0.5s ease"
+                                        }}></div>
+                                      </div>
+                                      
+                                      {/* Status dos obrigatórios */}
+                                      {itensObrigatorios > 0 && (
+                                        <div style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "8px",
+                                          padding: "8px",
+                                          background: obrigatoriosCompletos === itensObrigatorios ? "#d4f4e5" : "#fef3c7",
+                                          borderRadius: "6px",
+                                          border: `1px solid ${obrigatoriosCompletos === itensObrigatorios ? "#11A561" : "#f59e0b"}`
+                                        }}>
+                                          <span style={{ fontSize: "1.2rem" }}>
+                                            {obrigatoriosCompletos === itensObrigatorios ? "✅" : "⚠️"}
+                                          </span>
+                                          <span style={{
+                                            color: obrigatoriosCompletos === itensObrigatorios ? "#0a7340" : "#92400e",
+                                            fontSize: "0.85rem",
+                                            fontWeight: "600"
+                                          }}>
+                                            Itens Obrigatórios: {obrigatoriosCompletos}/{itensObrigatorios}
+                                            {obrigatoriosCompletos === itensObrigatorios ? " - Todos concluídos!" : " - Pendentes"}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                                
+                                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                  {checklistPrestador.etapa2.checklist.map((item, index) => (
+                                    <div
+                                      key={item.id || index}
+                                      style={{
+                                        padding: "14px",
+                                        background: item.checked 
+                                          ? 'linear-gradient(135deg, #d4f4e5 0%, #e6f9f0 100%)'
+                                          : item.obrigatorio 
+                                          ? "#fef3c7" 
+                                          : theme.bg,
+                                        border: item.checked 
+                                          ? "2px solid #11A561"
+                                          : `2px solid ${theme.border}`,
+                                        borderRadius: "8px",
+                                        boxShadow: item.checked ? "0 2px 8px rgba(17, 165, 97, 0.15)" : "none",
+                                        transition: "all 0.3s ease"
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "8px" }}>
+                                        <span style={{ 
+                                          fontSize: "1.8rem",
+                                          lineHeight: 1,
+                                          minWidth: "30px"
+                                        }}>
+                                          {item.checked ? '✅' : '⬜'}
+                                        </span>
+                                        <div style={{ flex: 1 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px", flexWrap: "wrap" }}>
+                                            {item.obrigatorio && (
+                                              <span style={{ 
+                                                color: "#f59e0b", 
+                                                fontSize: "1rem",
+                                                background: "#fef3c7",
+                                                padding: "2px 8px",
+                                                borderRadius: "4px",
+                                                fontWeight: "700"
+                                              }}>★ OBRIGATÓRIO</span>
+                                            )}
+                                            <strong style={{ 
+                                              color: item.checked ? "#0a7340" : theme.text, 
+                                              fontSize: "1rem",
+                                              fontWeight: "600",
+                                              textDecoration: item.checked ? "none" : "none"
+                                            }}>
+                                              {item.label}
+                                            </strong>
+                                            <span style={{ 
+                                              color: item.checked ? "#0a7340" : theme.subtext, 
+                                              fontSize: "0.75rem", 
+                                              background: item.checked ? "#d4f4e5" : theme.bg,
+                                              padding: "3px 8px",
+                                              borderRadius: "4px",
+                                              fontWeight: "500",
+                                              border: `1px solid ${item.checked ? "#11A561" : theme.border}`
+                                            }}>
+                                              {item.tipo === 'texto' && '📝 Texto'}
+                                              {item.tipo === 'foto' && '📷 Foto'}
+                                              {item.tipo === 'numero' && '🔢 Número'}
+                                              {item.tipo === 'data' && '📅 Data'}
+                                              {item.tipo === 'observacao' && '💬 Observação'}
+                                              {item.tipo === 'multipla_escolha' && '☑️ Múltipla Escolha'}
+                                            </span>
+                                            {item.checked && (
+                                              <span style={{ 
+                                                color: "#11A561", 
+                                                fontSize: "0.8rem",
+                                                background: "#d4f4e5",
+                                                padding: "3px 10px",
+                                                borderRadius: "12px",
+                                                fontWeight: "700",
+                                                border: "1px solid #11A561"
+                                              }}>✓ CONCLUÍDO</span>
+                                            )}
+                                          </div>
+                                          
+                                          {item.dica && (
+                                            <p style={{ margin: "4px 0", color: theme.subtext, fontSize: "0.8rem", fontStyle: "italic" }}>
+                                              💡 {item.dica}
+                                            </p>
+                                          )}
+                                          
+                                          {/* Mostrar opções selecionadas para múltipla escolha */}
+                                          {item.tipo === 'multipla_escolha' && (
+                                            <div style={{ 
+                                              marginTop: "8px", 
+                                              padding: "8px", 
+                                              background: "#f0f9ff",
+                                              border: "1px solid #bae6fd",
+                                              borderRadius: "4px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 6px 0", 
+                                                color: "#0369a1", 
+                                                fontSize: "0.8rem", 
+                                                fontWeight: "600" 
+                                              }}>
+                                                ☑️ Opções Selecionadas:
+                                              </p>
+                                              {item.opçõesSelecionadas && item.opçõesSelecionadas.length > 0 ? (
+                                                <ul style={{ 
+                                                  margin: 0, 
+                                                  paddingLeft: "20px",
+                                                  color: "#0c4a6e",
+                                                  fontSize: "0.85rem"
+                                                }}>
+                                                  {item.opçõesSelecionadas.map((opcao, idx) => (
+                                                    <li key={idx}>✓ {opcao}</li>
+                                                  ))}
+                                                </ul>
+                                              ) : item.opcoes && Array.isArray(item.opcoes) ? (
+                                                <ul style={{ 
+                                                  margin: 0, 
+                                                  paddingLeft: "20px",
+                                                  color: "#0c4a6e",
+                                                  fontSize: "0.85rem"
+                                                }}>
+                                                  {item.opcoes.filter(opcao => 
+                                                    typeof opcao === 'object' ? opcao.selecionada : false
+                                                  ).map((opcao, idx) => {
+                                                    const nomeOpcao = typeof opcao === 'object' ? opcao.nome : opcao;
+                                                    return <li key={idx}>✓ {nomeOpcao}</li>;
+                                                  })}
+                                                </ul>
+                                              ) : (
+                                                <p style={{ 
+                                                  margin: 0, 
+                                                  color: "#64748b", 
+                                                  fontSize: "0.8rem",
+                                                  fontStyle: "italic"
+                                                }}>
+                                                  Nenhuma opção selecionada
+                                                </p>
+                                              )}
+                                            </div>
+                                          )}
+                                          
+                                          {/* Mostrar valor preenchido para outros tipos */}
+                                          {item.valor && item.tipo !== 'foto' && item.tipo !== 'multipla_escolha' && (
+                                            <div style={{ 
+                                              marginTop: "8px", 
+                                              padding: "10px", 
+                                              background: "#f0fdf4",
+                                              border: "2px solid #11A561",
+                                              borderRadius: "6px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 4px 0", 
+                                                color: "#0a7340", 
+                                                fontSize: "0.75rem", 
+                                                fontWeight: "700",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.5px"
+                                              }}>
+                                                📝 Resposta do Prestador:
+                                              </p>
+                                              <p style={{ 
+                                                margin: 0, 
+                                                color: "#0f172a",
+                                                fontSize: "0.95rem",
+                                                fontWeight: "600",
+                                                padding: "6px 0"
+                                              }}>
+                                                {item.valor}
+                                              </p>
+                                            </div>
+                                          )}
+                                          
+                                          {item.obs && (
+                                            <div style={{ 
+                                              marginTop: "8px", 
+                                              padding: "10px", 
+                                              background: "#fef9e7",
+                                              border: "1px solid #f59e0b",
+                                              borderRadius: "6px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 4px 0", 
+                                                color: "#92400e", 
+                                                fontSize: "0.75rem", 
+                                                fontWeight: "700",
+                                                textTransform: "uppercase"
+                                              }}>
+                                                💬 Observação:
+                                              </p>
+                                              <p style={{ 
+                                                margin: 0, 
+                                                color: "#44403c",
+                                                fontSize: "0.9rem",
+                                                lineHeight: "1.5"
+                                              }}>
+                                                {item.obs}
+                                              </p>
+                                            </div>
+                                          )}
+                                          
+                                          {item.tipo === 'foto' && item.foto && (
+                                            <div style={{ 
+                                              marginTop: "12px",
+                                              padding: "12px",
+                                              background: "#f0fdf4",
+                                              border: "2px solid #11A561",
+                                              borderRadius: "8px"
+                                            }}>
+                                              <p style={{ 
+                                                margin: "0 0 10px 0", 
+                                                color: "#0a7340", 
+                                                fontSize: "0.85rem",
+                                                fontWeight: "700",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.5px"
+                                              }}>
+                                                📷 Foto Capturada pelo Prestador:
+                                              </p>
+                                              {item.foto.startsWith('file://') || item.foto.startsWith('/var/mobile') ? (
+                                                <div style={{
+                                                  padding: "16px",
+                                                  background: "#fef3c7",
+                                                  border: "1px dashed #f59e0b",
+                                                  borderRadius: "6px",
+                                                  textAlign: "center"
+                                                }}>
+                                                  <p style={{ 
+                                                    margin: "0 0 8px 0", 
+                                                    color: "#92400e", 
+                                                    fontSize: "0.85rem",
+                                                    fontWeight: "600"
+                                                  }}>
+                                                    📱 Foto armazenada no dispositivo móvel
+                                                  </p>
+                                                  <p style={{ 
+                                                    margin: 0, 
+                                                    color: "#78350f", 
+                                                    fontSize: "0.75rem"
+                                                  }}>
+                                                    Esta foto está salva localmente no aplicativo do prestador.
+                                                    <br />
+                                                    Para visualizar, sincronize com o servidor ou acesse via app.
+                                                  </p>
+                                                </div>
+                                              ) : (
+                                                <>
+                                                  <img 
+                                                    src={item.foto} 
+                                                    alt={item.label}
+                                                    style={{ 
+                                                      maxWidth: "100%", 
+                                                      maxHeight: "200px",
+                                                      borderRadius: "6px",
+                                                      border: `1px solid ${theme.border}`,
+                                                      objectFit: "cover"
+                                                    }}
+                                                    onError={(e) => {
+                                                      e.target.style.display = 'none';
+                                                      e.target.nextSibling.style.display = 'block';
+                                                    }}
+                                                  />
+                                                  <div style={{ 
+                                                    display: 'none',
+                                                    padding: "16px",
+                                                    background: "#fee2e2",
+                                                    border: "1px solid #ef4444",
+                                                    borderRadius: "6px",
+                                                    textAlign: "center"
+                                                  }}>
+                                                    <p style={{ 
+                                                      margin: 0, 
+                                                      color: '#991b1b', 
+                                                      fontSize: '0.8rem' 
+                                                    }}>
+                                                      ⚠️ Erro ao carregar imagem
+                                                    </p>
+                                                  </div>
+                                                </>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Informações de conclusão da etapa 2 */}
+                            <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: "12px", marginTop: "12px" }}>
+                              {checklistPrestador.etapa2.observacoesGerais && (
+                                <p style={{ margin: "0 0 8px 0", color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Observações Gerais:</strong> {checklistPrestador.etapa2.observacoesGerais}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa2.horaFinalizacao && (
+                                <p style={{ margin: "0 0 8px 0", color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Hora de Finalização:</strong> {new Date(checklistPrestador.etapa2.horaFinalizacao).toLocaleString('pt-BR')}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa2.completedAt && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Completado em:</strong> {new Date(checklistPrestador.etapa2.completedAt).toLocaleString('pt-BR')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Etapa 3 - Revisão */}
+                        {checklistPrestador.etapa3 && (
+                          <div style={{
+                            background: theme.cardBg,
+                            border: `1px solid ${theme.border}`,
+                            borderRadius: "8px",
+                            padding: "16px"
+                          }}>
+                            <h4 style={{ margin: "0 0 12px 0", color: theme.text, fontSize: "1rem" }}>
+                              ✍️ Etapa 3 - Revisão e Assinatura
+                            </h4>
+                            
+                            {/* Assinatura */}
+                            {checklistPrestador.etapa3.assinaturaBase64 && (
+                              <div style={{ marginBottom: "16px" }}>
+                                <p style={{ margin: "0 0 8px 0", color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>✍️ Assinatura do Cliente:</strong>
+                                </p>
+                                <img 
+                                  src={checklistPrestador.etapa3.assinaturaBase64} 
+                                  alt="Assinatura"
+                                  style={{ 
+                                    maxWidth: "100%", 
+                                    maxHeight: "150px",
+                                    background: "white",
+                                    borderRadius: "6px",
+                                    border: `1px solid ${theme.border}`,
+                                    padding: "8px"
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {/* Informações da etapa 3 */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                              {checklistPrestador.etapa3.observacoesRevisao && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Observações da Revisão:</strong> {checklistPrestador.etapa3.observacoesRevisao}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa3.duracaoTotal && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Duração Total:</strong> {checklistPrestador.etapa3.duracaoTotal}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa3.horaFinalizacaoTotal && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Hora de Finalização Total:</strong> {new Date(checklistPrestador.etapa3.horaFinalizacaoTotal).toLocaleString('pt-BR')}
+                                </p>
+                              )}
+                              {checklistPrestador.etapa3.completedAt && (
+                                <p style={{ margin: 0, color: theme.subtext, fontSize: "0.9rem" }}>
+                                  <strong>Completado em:</strong> {new Date(checklistPrestador.etapa3.completedAt).toLocaleString('pt-BR')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    ) : (
+                      <div style={{
+                        textAlign: "center",
+                        color: theme.subtext,
+                        fontSize: "0.9rem",
+                        padding: "40px 20px",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: "12px"
+                      }}>
+                        <FiCheckSquare size={48} style={{ opacity: 0.3 }} />
+                        <div>
+                          Nenhum checklist preenchido pelo prestador.
+                        </div>
+                        <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                          Os dados aparecerão aqui quando o prestador completar as etapas no aplicativo.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               <div style={{ 
                 display: "flex", 
                 justifyContent: "flex-end", 
                 gap: "12px", 
                 borderTop: `1px solid ${theme.border}`,
-                paddingTop: "20px"
+                paddingTop: "12px",
+                marginTop: "auto"
               }}>
                 {detalhesOS.status !== "Concluída" && (
                   <motion.button 
@@ -2373,9 +4306,10 @@ export default function OrdemServico() {
                     onClick={() => {
                       changeStatus(detalhesOS.codigo, "Concluída");
                       setDetalhesOS(null);
+                      setAbaDetalhesOS('info');
                     }}
                     style={{
-                      background: "#10b981",
+                      background: "#11A561",
                       color: "white",
                       border: "none",
                       borderRadius: "8px",
@@ -2396,7 +4330,10 @@ export default function OrdemServico() {
                 <motion.button 
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => setDetalhesOS(null)}
+                  onClick={() => {
+                    setDetalhesOS(null);
+                    setAbaDetalhesOS('info');
+                  }}
                   style={{
                     background: theme.cancelButtonBg,
                     color: theme.cancelButtonText,
@@ -2416,7 +4353,7 @@ export default function OrdemServico() {
         )}
       </AnimatePresence>
 
-      {/* Rodapé com informações */}
+      {/* Rodapé com informações e paginação */}
       <div style={{ 
         display: "flex", 
         justifyContent: "space-between", 
@@ -2424,11 +4361,45 @@ export default function OrdemServico() {
         color: theme.subtext,
         fontSize: "0.9rem",
         padding: "0 8px",
-        marginTop: "16px"
+        marginTop: "16px",
+        flexWrap: "wrap",
+        gap: "12px"
       }}>
         <div>
-          Mostrando {ordensFiltradas.length} de {total} ordens de serviço
+          Mostrando {indiceInicio + 1}-{Math.min(indiceFim, ordensFiltradas.length)} de {ordensFiltradas.length} ordens
         </div>
+        
+        {/* Controles de Paginação */}
+        {totalPaginas > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            {[...Array(totalPaginas)].map((_, index) => {
+              const numeroPagina = index + 1;
+              return (
+                <motion.button
+                  key={numeroPagina}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setPaginaAtual(numeroPagina)}
+                  style={{
+                    minWidth: "32px",
+                    height: "32px",
+                    padding: "0 8px",
+                    background: paginaAtual === numeroPagina ? theme.highlight : theme.bg,
+                    color: paginaAtual === numeroPagina ? "white" : theme.text,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
+                    fontWeight: paginaAtual === numeroPagina ? 700 : 500
+                  }}
+                >
+                  {numeroPagina}
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+        
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <FiRefreshCw size={14} className={atualizando ? "spin" : ""} />
           Última atualização: {new Date().toLocaleTimeString()}

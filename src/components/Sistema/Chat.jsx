@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiTrash2 } from 'react-icons/fi';
 import * as firebase from '../../services/firebase';
 import { processarMensagemIAInteligente } from '../../services/ia';
+import { db } from '../../firebase/firebaseConfig';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 export default function Chat() {
   const [activeArea, setActiveArea] = useState('conversas');
@@ -69,6 +71,39 @@ export default function Chat() {
       clearInterval(interval);
     };
   }, [chatSelecionado?.id]); // Só reiniciar se o chat mudar
+
+  // 🔥 TEMPO REAL: Listener para mensagens (conversa entre funcionários)
+  useEffect(() => {
+    if (!chatSelecionado || !companyCnpj || !db) return;
+
+    try {
+      const messagesRef = collection(db, 'companies', companyCnpj.replace(/\D/g, ''), 'chats', chatSelecionado.id, 'messages');
+      const q = query(messagesRef, orderBy('dataEnvio', 'asc'));
+
+      console.log('🔥 Iniciando listener de mensagens em tempo real para:', chatSelecionado.id);
+
+      // Listener em tempo real
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const msgs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log('📨 Mensagens atualizadas em tempo real:', msgs.length);
+        setMensagens(msgs);
+      }, (error) => {
+        console.error('❌ Erro no listener de mensagens:', error);
+      });
+
+      // Cleanup: remover listener quando componente desmontar ou chat mudar
+      return () => {
+        console.log('🔌 Removendo listener de mensagens');
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error('❌ Erro ao configurar listener:', error);
+    }
+  }, [chatSelecionado?.id, companyCnpj]);
 
   // Monitorar mensagens e acionar Zoé
   useEffect(() => {
@@ -688,7 +723,7 @@ export default function Chat() {
       transition: 'all 0.2s ease'
     },
     areaButtonActive: {
-      backgroundColor: '#0ea5e9',
+      backgroundColor: '#2C30D5',
       color: 'white'
     },
     areaButtonInactive: {
@@ -741,7 +776,7 @@ export default function Chat() {
     },
     chatItemActive: {
       backgroundColor: '#e0f2fe',
-      borderLeft: '4px solid #0ea5e9'
+      borderLeft: '4px solid #2C30D5'
     },
     chatItemTitle: {
       fontSize: '0.875rem',
@@ -758,7 +793,7 @@ export default function Chat() {
     },
     newChatBtn: {
       padding: '12px 16px',
-      backgroundColor: '#0ea5e9',
+      backgroundColor: '#2C30D5',
       color: 'white',
       border: 'none',
       borderRadius: '8px',
@@ -858,7 +893,7 @@ export default function Chat() {
     },
     sendBtn: {
       padding: '10px 16px',
-      backgroundColor: '#0ea5e9',
+      backgroundColor: '#2C30D5',
       color: 'white',
       border: 'none',
       borderRadius: '8px',
@@ -919,7 +954,7 @@ export default function Chat() {
       cursor: 'pointer'
     },
     primaryButton: {
-      backgroundColor: '#0ea5e9',
+      backgroundColor: '#2C30D5',
       color: 'white'
     },
     secondaryButton: {
@@ -1290,7 +1325,7 @@ export default function Chat() {
                     <motion.button
                       style={{
                         ...styles.sendBtn,
-                        backgroundColor: '#8b5cf6',
+                        backgroundColor: '#889DD3',
                         flex: '0 0 auto'
                       }}
                       onClick={() => setShowTemplates(!showTemplates)}
@@ -1332,7 +1367,7 @@ export default function Chat() {
                         }}
                         style={{
                           padding: '10px',
-                          backgroundColor: '#10b981',
+                          backgroundColor: '#11A561',
                           color: 'white',
                           border: 'none',
                           borderRadius: '6px',
@@ -1342,8 +1377,8 @@ export default function Chat() {
                           textAlign: 'left',
                           transition: 'all 0.2s ease'
                         }}
-                        onMouseOver={e => e.target.style.backgroundColor = '#059669'}
-                        onMouseOut={e => e.target.style.backgroundColor = '#10b981'}
+                        onMouseOver={e => e.target.style.backgroundColor = '#0d8550'}
+                        onMouseOut={e => e.target.style.backgroundColor = '#11A561'}
                       >
                         ⭐ Solicitar Avaliação (0-10)
                       </button>
@@ -1354,7 +1389,7 @@ export default function Chat() {
                         }}
                         style={{
                           padding: '10px',
-                          backgroundColor: '#3b82f6',
+                          backgroundColor: '#2C30D5',
                           color: 'white',
                           border: 'none',
                           borderRadius: '6px',
@@ -1365,7 +1400,7 @@ export default function Chat() {
                           transition: 'all 0.2s ease'
                         }}
                         onMouseOver={e => e.target.style.backgroundColor = '#2563eb'}
-                        onMouseOut={e => e.target.style.backgroundColor = '#3b82f6'}
+                        onMouseOut={e => e.target.style.backgroundColor = '#2C30D5'}
                       >
                         ✅ Confirmar Conclusão
                       </button>
@@ -1398,7 +1433,7 @@ export default function Chat() {
                         }}
                         style={{
                           padding: '10px',
-                          backgroundColor: '#8b5cf6',
+                          backgroundColor: '#889DD3',
                           color: 'white',
                           border: 'none',
                           borderRadius: '6px',
@@ -1409,7 +1444,7 @@ export default function Chat() {
                           transition: 'all 0.2s ease'
                         }}
                         onMouseOver={e => e.target.style.backgroundColor = '#7c3aed'}
-                        onMouseOut={e => e.target.style.backgroundColor = '#8b5cf6'}
+                        onMouseOut={e => e.target.style.backgroundColor = '#889DD3'}
                       >
                         🔄 Status do Atendimento
                       </button>
@@ -1481,7 +1516,7 @@ export default function Chat() {
                     style={{
                       flex: 1,
                       padding: '8px 12px',
-                      backgroundColor: '#0ea5e9',
+                      backgroundColor: '#2C30D5',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
@@ -1574,7 +1609,7 @@ export default function Chat() {
                         marginBottom: '4px',
                         backgroundColor: novoChat.participantes.some(p => p.id === user.id) ? '#e0f2fe' : '#f8fafc',
                         cursor: 'pointer',
-                        border: novoChat.participantes.some(p => p.id === user.id) ? '2px solid #0ea5e9' : '2px solid transparent'
+                        border: novoChat.participantes.some(p => p.id === user.id) ? '2px solid #2C30D5' : '2px solid transparent'
                       }}
                       onClick={() => {
                         const jaAdicionado = novoChat.participantes.some(p => p.id === user.id);
@@ -1620,7 +1655,7 @@ export default function Chat() {
                             alignItems: 'center',
                             gap: '4px',
                             padding: '4px 8px',
-                            backgroundColor: '#0ea5e9',
+                            backgroundColor: '#2C30D5',
                             color: 'white',
                             borderRadius: '9999px',
                             fontSize: '0.75rem'

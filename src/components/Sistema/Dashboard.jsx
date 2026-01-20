@@ -5,7 +5,7 @@ import OrdemServico from "./OrdemServico";
 import Compras from "./Compras";
 import Estoque from "./Estoque";
 import Financeiro from "./Financeiro";
-import CRM from "./CRM";
+import CRM from "../../crm/CRM"; // Novo CRM completo com proteção ADMIN
 import Chat from "./Chat";
 import Automacao from "./Automacao";
 import Configuracoes from "./Configuracoes";
@@ -51,7 +51,7 @@ const Breadcrumb = () => {
   if (activePath === "perfil") {
     return (
       <div className="breadcrumb">
-        <span className="breadcrumb-home">SmartOps</span>
+        <span className="breadcrumb-home">Zillo Assist</span>
         <span className="breadcrumb-separator">/</span>
         <span className="breadcrumb-current">Meu Perfil</span>
       </div>
@@ -62,7 +62,7 @@ const Breadcrumb = () => {
 
   return (
     <div className="breadcrumb">
-      <span className="breadcrumb-home">SmartOps</span>
+      <span className="breadcrumb-home">Zillo Assist</span>
       <span className="breadcrumb-separator">/</span>
       {currentMenu && (
         <span className="breadcrumb-current">
@@ -98,7 +98,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const userName = localStorage.getItem("userName") || "Usuário";
-  const userEmail = localStorage.getItem("userEmail") || "usuario@smartops.com";
+  const userEmail = localStorage.getItem("userEmail") || "usuario@zilloassist.com";
   const userInitial = userName.charAt(0).toUpperCase();
   const userRole = localStorage.getItem('userRole') || 'user';
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
@@ -121,8 +121,8 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
     <aside className={`sidebar ${isMobileMenuOpen ? "open" : ""}`}>
       <div className="logo-container">
         <h1 className="logo">
-          <span className="logo-icon">S</span>
-          SmartOps
+          <span className="logo-icon">Z</span>
+          Zillo Assist
         </h1>
       </div>
       
@@ -166,12 +166,16 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
       {/* Admin-only link to manage company users */}
       {userRole === 'admin' && (
         <div style={{ padding: '8px 20px' }}>
-          <a href="/dashboard/crm" className="menu-link crm-link">Usuários (empresa){companyBadge ? <span className="company-badge">{companyBadge}</span> : null}</a>
+          <NavLink to="/dashboard/crm" className="menu-link crm-link">
+            Usuários (empresa){companyBadge ? <span className="company-badge">{companyBadge}</span> : null}
+          </NavLink>
         </div>
       )}
       {(userRole === 'admin' || userRole === 'gerente') && (
         <div style={{ padding: '4px 20px 12px' }}>
-          <a href="/dashboard/users-edit" className="menu-link crm-link">Gerenciar Usuários</a>
+          <NavLink to="/dashboard/users-edit" className="menu-link crm-link">
+            Gerenciar Usuários
+          </NavLink>
         </div>
       )}
       
@@ -220,7 +224,15 @@ const Header = ({ toggleMobileMenu }) => {
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [prestadorNotificationsOpen, setPrestadorNotificationsOpen] = useState(false);
   const [toastNotification, setToastNotification] = useState(null);
+  const [notificacoes, setNotificacoes] = useState([]);
+  const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
+  const [notificacoesPrestador, setNotificacoesPrestador] = useState([]);
+  const [notificacoesPrestadorNaoLidas, setNotificacoesPrestadorNaoLidas] = useState(0);
+  
+  const companyCnpj = localStorage.getItem('companyCnpj') || '';
+  const userName = localStorage.getItem('userName') || 'Usuário';
   
   // Extrair o caminho ativo após "dashboard"
   const currentPath = location.pathname.split('/').filter(x => x);
@@ -234,7 +246,6 @@ const Header = ({ toggleMobileMenu }) => {
   const pageTitle = isProfilePage ? "Meu Perfil" : (menu.find(item => item.path === activePath)?.label || "");
   const pageIcon = isProfilePage ? "👤" : (menu.find(item => item.path === activePath)?.icon || "");
   
-  const userName = localStorage.getItem("userName") || "Usuário";
   const userInitial = userName.charAt(0).toUpperCase();
 
   // Função para tocar som de sino
@@ -268,6 +279,241 @@ const Header = ({ toggleMobileMenu }) => {
     window.showHeaderNotification = showNotification;
     return () => delete window.showHeaderNotification;
   }, []);
+
+  // 🔥 Carregar notificações em tempo real
+  useEffect(() => {
+    if (!companyCnpj) return;
+
+    const carregarNotificacoes = async () => {
+      try {
+        // Importar firebase dinamicamente
+        const firebase = await import('../../services/firebase');
+        
+        const notifs = [];
+        
+        // 1. Chat - Mensagens não lidas
+        const chats = await firebase.listChats(companyCnpj, userName);
+        const chatsComMensagensNovas = chats?.filter(chat => chat.unreadCount > 0) || [];
+        chatsComMensagensNovas.forEach(chat => {
+          notifs.push({
+            id: `chat-${chat.id}`,
+            tipo: 'chat',
+            titulo: '💬 Nova mensagem no chat',
+            mensagem: `${chat.titulo || 'Conversa'}: ${chat.unreadCount} mensagem(ns) não lida(s)`,
+            timestamp: new Date().toISOString(),
+            lida: false,
+            link: '/dashboard/chat'
+          });
+        });
+
+        // 2. Estoque - Itens com baixo estoque
+        const produtos = await firebase.listProducts(companyCnpj);
+        const produtosBaixoEstoque = produtos?.filter(p => p.quantidade <= p.minimo && p.quantidade > 0) || [];
+        produtosBaixoEstoque.forEach(produto => {
+          notifs.push({
+            id: `estoque-${produto.id}`,
+            tipo: 'estoque',
+            titulo: '⚠️ Estoque baixo',
+            mensagem: `${produto.nome}: apenas ${produto.quantidade} ${produto.unidade} restante(s)`,
+            timestamp: new Date().toISOString(),
+            lida: false,
+            link: '/dashboard/estoque'
+          });
+        });
+
+        // 3. Ordens de Serviço - Pendentes
+        const ordens = await firebase.listServiceOrders(companyCnpj);
+        const ordensPendentes = ordens?.filter(os => os.status === 'Pendente') || [];
+        if (ordensPendentes.length > 0) {
+          notifs.push({
+            id: 'os-pendentes',
+            tipo: 'os',
+            titulo: '📋 Ordens de Serviço Pendentes',
+            mensagem: `${ordensPendentes.length} OS aguardando atendimento`,
+            timestamp: new Date().toISOString(),
+            lida: false,
+            link: '/dashboard/os'
+          });
+        }
+
+        // 4. Compras - Pedidos recentes
+        const pedidos = await firebase.listPurchaseOrders(companyCnpj);
+        const pedidosPendentes = pedidos?.filter(p => p.status === 'Pendente' || p.status === 'Aprovado') || [];
+        if (pedidosPendentes.length > 0) {
+          notifs.push({
+            id: 'compras-pendentes',
+            tipo: 'compras',
+            titulo: '🛒 Pedidos de Compra',
+            mensagem: `${pedidosPendentes.length} pedido(s) em andamento`,
+            timestamp: new Date().toISOString(),
+            lida: false,
+            link: '/dashboard/compras'
+          });
+        }
+
+        // Ordenar por timestamp (mais recente primeiro)
+        notifs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        setNotificacoes(notifs);
+        setNotificacoesNaoLidas(notifs.filter(n => !n.lida).length);
+      } catch (error) {
+        console.error('Erro ao carregar notificações:', error);
+      }
+    };
+
+    carregarNotificacoes();
+    
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(carregarNotificacoes, 30000);
+    
+    return () => clearInterval(interval);
+  }, [companyCnpj, userName]);
+
+  // 🔥 Carregar notificações de prestadores em tempo real
+  useEffect(() => {
+    if (!companyCnpj) return;
+
+    const carregarNotificacoesPrestador = async () => {
+      try {
+        const firebase = await import('../../services/firebase');
+        const notifs = [];
+        
+        // Buscar ordens de serviço com prestadores
+        const ordens = await firebase.listServiceOrders(companyCnpj);
+        const ordensAtivas = ordens?.filter(os => 
+          os.status === 'Em Andamento' || os.status === 'Atribuída'
+        ) || [];
+
+        ordensAtivas.forEach(os => {
+          if (os.prestador) {
+            // Verificar se prestador entrou no raio
+            if (os.prestadorNoRaio && !os.notificadoEntradaRaio) {
+              notifs.push({
+                id: `prestador-raio-${os.id}`,
+                tipo: 'raio',
+                titulo: '📍 Prestador no raio do serviço',
+                mensagem: `${os.prestador} chegou próximo ao local da OS #${os.numero}`,
+                timestamp: new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+
+            // Verificar se prestador chegou no local
+            if (os.prestadorNoLocal && !os.notificadoChegada) {
+              notifs.push({
+                id: `prestador-chegada-${os.id}`,
+                tipo: 'chegada',
+                titulo: '✅ Prestador chegou no local',
+                mensagem: `${os.prestador} chegou no endereço da OS #${os.numero}`,
+                timestamp: new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+
+            // Verificar se prestador iniciou o serviço
+            if (os.checklistPrestador?.etapa1?.iniciado && !os.notificadoInicio) {
+              notifs.push({
+                id: `prestador-inicio-${os.id}`,
+                tipo: 'inicio',
+                titulo: '🛠️ Serviço iniciado',
+                mensagem: `${os.prestador} iniciou o atendimento da OS #${os.numero}`,
+                timestamp: os.checklistPrestador.etapa1.dataHoraInicio || new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+
+            // Verificar se prestador finalizou o serviço
+            if (os.checklistPrestador?.etapa3?.finalizado && !os.notificadoFinalizacao) {
+              notifs.push({
+                id: `prestador-finalizacao-${os.id}`,
+                tipo: 'finalizacao',
+                titulo: '🎉 Serviço finalizado',
+                mensagem: `${os.prestador} concluiu o atendimento da OS #${os.numero}`,
+                timestamp: os.checklistPrestador.etapa3.dataHoraFinalizacao || new Date().toISOString(),
+                lida: false,
+                osId: os.id,
+                link: '/dashboard/os'
+              });
+            }
+          }
+        });
+
+        // Ordenar por timestamp (mais recente primeiro)
+        notifs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        setNotificacoesPrestador(notifs);
+        setNotificacoesPrestadorNaoLidas(notifs.filter(n => !n.lida).length);
+
+        // Mostrar popup para novas notificações de prestador
+        notifs.forEach(notif => {
+          if (!notif.lida) {
+            showNotification(notif.titulo, notif.mensagem, 'info');
+          }
+        });
+      } catch (error) {
+        console.error('Erro ao carregar notificações de prestador:', error);
+      }
+    };
+
+    carregarNotificacoesPrestador();
+    
+    // Atualizar a cada 15 segundos (mais frequente para prestadores)
+    const interval = setInterval(carregarNotificacoesPrestador, 15000);
+    
+    return () => clearInterval(interval);
+  }, [companyCnpj]);
+  
+  // Marcar notificação como lida
+  const marcarComoLida = (notifId) => {
+    setNotificacoes(prev => prev.map(n => 
+      n.id === notifId ? { ...n, lida: true } : n
+    ));
+    setNotificacoesNaoLidas(prev => Math.max(0, prev - 1));
+  };
+
+  // Marcar notificação de prestador como lida
+  const marcarPrestadorComoLida = (notifId) => {
+    setNotificacoesPrestador(prev => prev.map(n => 
+      n.id === notifId ? { ...n, lida: true } : n
+    ));
+    setNotificacoesPrestadorNaoLidas(prev => Math.max(0, prev - 1));
+  };
+
+  // Marcar todas como lidas
+  const marcarTodasComoLidas = () => {
+    setNotificacoes(prev => prev.map(n => ({ ...n, lida: true })));
+    setNotificacoesNaoLidas(0);
+  };
+
+  // Marcar todas notificações de prestador como lidas
+  const marcarTodasPrestadorComoLidas = () => {
+    setNotificacoesPrestador(prev => prev.map(n => ({ ...n, lida: true })));
+    setNotificacoesPrestadorNaoLidas(0);
+  };
+
+  // Navegar para notificação
+  const abrirNotificacao = (notif) => {
+    marcarComoLida(notif.id);
+    setNotificationsOpen(false);
+    if (notif.link) {
+      navigate(notif.link);
+    }
+  };
+
+  // Navegar para notificação de prestador
+  const abrirNotificacaoPrestador = (notif) => {
+    marcarPrestadorComoLida(notif.id);
+    setPrestadorNotificationsOpen(false);
+    if (notif.link) {
+      navigate(notif.link);
+    }
+  };
   
   const handleLogout = () => {
     // Limpar dados de autenticação
@@ -327,7 +573,7 @@ const Header = ({ toggleMobileMenu }) => {
             gap: '12px',
             minWidth: '350px',
             backgroundColor: toastNotification.type === 'critical' ? '#ef4444' : 
-                            toastNotification.type === 'warning' ? '#f59e0b' : '#10b981',
+                            toastNotification.type === 'warning' ? '#f59e0b' : '#11A561',
             color: 'white',
             fontWeight: '600',
             fontSize: '14px',
@@ -362,7 +608,9 @@ const Header = ({ toggleMobileMenu }) => {
             onClick={() => setNotificationsOpen(!notificationsOpen)}
           >
             🔔
-            <span className="notification-badge">3</span>
+            {notificacoesNaoLidas > 0 && (
+              <span className="notification-badge">{notificacoesNaoLidas}</span>
+            )}
           </button>
           
           {notificationsOpen && (
@@ -370,34 +618,153 @@ const Header = ({ toggleMobileMenu }) => {
               <div className="dropdown-arrow"></div>
               <div className="notifications-header">
                 <h3>Notificações</h3>
-                <button className="mark-all-read">Marcar todas como lidas</button>
+                {notificacoesNaoLidas > 0 && (
+                  <button className="mark-all-read" onClick={marcarTodasComoLidas}>
+                    Marcar todas como lidas
+                  </button>
+                )}
               </div>
               <ul className="notifications-list">
-                <li className="notification-item unread">
-                  <div className="notification-icon">📝</div>
-                  <div className="notification-content">
-                    <p className="notification-text">Nova ordem de serviço criada</p>
-                    <p className="notification-time">Há 10 minutos</p>
-                  </div>
-                </li>
-                <li className="notification-item unread">
-                  <div className="notification-icon">📦</div>
-                  <div className="notification-content">
-                    <p className="notification-text">Estoque baixo de produto #1234</p>
-                    <p className="notification-time">Há 2 horas</p>
-                  </div>
-                </li>
-                <li className="notification-item unread">
-                  <div className="notification-icon">💰</div>
-                  <div className="notification-content">
-                    <p className="notification-text">Pagamento recebido de Cliente XYZ</p>
-                    <p className="notification-time">Há 1 dia</p>
-                  </div>
-                </li>
+                {notificacoes.length === 0 ? (
+                  <li className="notification-item" style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '8px' }}>🔔</div>
+                    <p>Nenhuma notificação</p>
+                  </li>
+                ) : (
+                  notificacoes.map(notif => (
+                    <li 
+                      key={notif.id} 
+                      className={`notification-item ${!notif.lida ? 'unread' : ''}`}
+                      onClick={() => abrirNotificacao(notif)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="notification-icon">
+                        {notif.tipo === 'chat' && '💬'}
+                        {notif.tipo === 'estoque' && '📦'}
+                        {notif.tipo === 'os' && '📋'}
+                        {notif.tipo === 'compras' && '🛒'}
+                        {notif.tipo === 'ia' && '🤖'}
+                      </div>
+                      <div className="notification-content">
+                        <p className="notification-text" style={{ fontWeight: !notif.lida ? '600' : '400' }}>
+                          {notif.mensagem}
+                        </p>
+                        <p className="notification-time">
+                          {new Date(notif.timestamp).toLocaleTimeString('pt-BR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                      </div>
+                    </li>
+                  ))
+                )}
               </ul>
-              <div className="notifications-footer">
-                <a href="#all-notifications" className="view-all">Ver todas</a>
+              {notificacoes.length > 0 && (
+                <div className="notifications-footer">
+                  <button 
+                    onClick={() => { setNotificationsOpen(false); marcarTodasComoLidas(); }}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#2C30D5', 
+                      cursor: 'pointer',
+                      padding: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Limpar todas
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Botão P de Prestador */}
+        <div className="notification-container">
+          <button 
+            className="action-button prestador-button" 
+            aria-label="Notificações de Prestadores"
+            onClick={() => setPrestadorNotificationsOpen(!prestadorNotificationsOpen)}
+            style={{
+              background: 'linear-gradient(135deg, #11A561 0%, #0d8f51 100%)',
+              fontWeight: '700',
+              fontSize: '16px',
+              letterSpacing: '0.5px'
+            }}
+          >
+            P
+            {notificacoesPrestadorNaoLidas > 0 && (
+              <span className="notification-badge">{notificacoesPrestadorNaoLidas}</span>
+            )}
+          </button>
+          
+          {prestadorNotificationsOpen && (
+            <div className="notifications-dropdown">
+              <div className="dropdown-arrow"></div>
+              <div className="notifications-header">
+                <h3>🚀 Prestadores</h3>
+                {notificacoesPrestadorNaoLidas > 0 && (
+                  <button className="mark-all-read" onClick={marcarTodasPrestadorComoLidas}>
+                    Marcar todas como lidas
+                  </button>
+                )}
               </div>
+              <ul className="notifications-list">
+                {notificacoesPrestador.length === 0 ? (
+                  <li className="notification-item" style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '8px' }}>🚀</div>
+                    <p>Nenhuma atividade de prestador</p>
+                  </li>
+                ) : (
+                  notificacoesPrestador.map(notif => (
+                    <li 
+                      key={notif.id} 
+                      className={`notification-item ${!notif.lida ? 'unread' : ''}`}
+                      onClick={() => abrirNotificacaoPrestador(notif)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="notification-icon">
+                        {notif.tipo === 'raio' && '📍'}
+                        {notif.tipo === 'chegada' && '✅'}
+                        {notif.tipo === 'inicio' && '🛠️'}
+                        {notif.tipo === 'finalizacao' && '🎉'}
+                      </div>
+                      <div className="notification-content">
+                        <p className="notification-text" style={{ fontWeight: !notif.lida ? '600' : '400' }}>
+                          {notif.mensagem}
+                        </p>
+                        <p className="notification-time">
+                          {new Date(notif.timestamp).toLocaleTimeString('pt-BR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+              {notificacoesPrestador.length > 0 && (
+                <div className="notifications-footer">
+                  <button 
+                    onClick={() => { setPrestadorNotificationsOpen(false); marcarTodasPrestadorComoLidas(); }}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#11A561', 
+                      cursor: 'pointer',
+                      padding: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Limpar todas
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

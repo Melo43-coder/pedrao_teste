@@ -19,7 +19,8 @@ export default function Configuracoes() {
     obrigatorio: false,
     tempoEstimado: 30,
     instrucoes: '',
-    clienteVe: false
+    clienteVe: false,
+    logoBase64: '' // Logo para aparecer no PDF
   });
   const [checklistItemInput, setChecklistItemInput] = useState('');
   const [checklistItemTipo, setChecklistItemTipo] = useState('texto');
@@ -43,6 +44,9 @@ export default function Configuracoes() {
   const [editingChecklistId, setEditingChecklistId] = useState(null);
   const [editingSeguradoraId, setEditingSeguradoraId] = useState(null);
   const [activeTab, setActiveTab] = useState('checklists');
+  const [multiplaEscolhaOpcoes, setMultiplaEscolhaOpcoes] = useState('');
+  const [showOpcoesInput, setShowOpcoesInput] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
 
   // Carregar CNPJ
   useEffect(() => {
@@ -70,18 +74,31 @@ export default function Configuracoes() {
 
   const adicionarItemChecklist = () => {
     if (checklistItemInput.trim()) {
+      const novoItem = { 
+        id: Date.now(),
+        texto: checklistItemInput, 
+        tipo: checklistItemTipo,
+        obrigatorio: false,
+        dica: ''
+      };
+
+      // Se for múltipla escolha, adicionar as opções
+      if (checklistItemTipo === 'multipla_escolha') {
+        if (!multiplaEscolhaOpcoes.trim()) {
+          alert('❌ Adicione as opções para múltipla escolha (separadas por vírgula)');
+          return;
+        }
+        novoItem.opcoes = multiplaEscolhaOpcoes.split(',').map(op => op.trim()).filter(op => op);
+      }
+
       setNovaChecklist({
         ...novaChecklist,
-        itens: [...novaChecklist.itens, { 
-          id: Date.now(),
-          texto: checklistItemInput, 
-          tipo: checklistItemTipo,
-          obrigatorio: false,
-          dica: ''
-        }]
+        itens: [...novaChecklist.itens, novoItem]
       });
       setChecklistItemInput('');
       setChecklistItemTipo('texto');
+      setMultiplaEscolhaOpcoes('');
+      setShowOpcoesInput(false);
     }
   };
 
@@ -90,6 +107,38 @@ export default function Configuracoes() {
       ...novaChecklist,
       itens: novaChecklist.itens.filter(item => item.id !== itemId)
     });
+  };
+
+  // Funções de Drag and Drop para reordenar itens
+  const handleDragStart = (item) => {
+    setDraggedItem(item);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (targetItem) => {
+    if (!draggedItem || draggedItem.id === targetItem.id) return;
+
+    const items = [...novaChecklist.itens];
+    const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
+    const targetIndex = items.findIndex(item => item.id === targetItem.id);
+
+    // Remove o item da posição original
+    const [removed] = items.splice(draggedIndex, 1);
+    // Insere na nova posição
+    items.splice(targetIndex, 0, removed);
+
+    setNovaChecklist({
+      ...novaChecklist,
+      itens: items
+    });
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
   };
 
   const salvarChecklist = async () => {
@@ -143,10 +192,35 @@ export default function Configuracoes() {
       obrigatorio: false,
       tempoEstimado: 30,
       instrucoes: '',
-      clienteVe: false
+      clienteVe: false,
+      logoBase64: ''
     });
     setEditingChecklistId(null);
     setShowChecklistModal(false);
+  };
+
+  // Função para fazer upload da logo
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      alert('❌ Por favor, selecione apenas arquivos de imagem (PNG, JPG, etc.)');
+      return;
+    }
+
+    // Validar tamanho (máx 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('❌ A imagem deve ter no máximo 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNovaChecklist({ ...novaChecklist, logoBase64: reader.result });
+    };
+    reader.readAsDataURL(file);
   };
 
   const editarChecklist = (checklist) => {
@@ -271,7 +345,7 @@ export default function Configuracoes() {
           onClick={() => setActiveTab('checklists')}
           style={{
             padding: '12px 24px',
-            background: activeTab === 'checklists' ? '#667eea' : 'transparent',
+            background: activeTab === 'checklists' ? '#2C30D5' : 'transparent',
             color: activeTab === 'checklists' ? '#fff' : '#64748b',
             border: 'none',
             borderRadius: '8px',
@@ -287,7 +361,7 @@ export default function Configuracoes() {
           onClick={() => setActiveTab('seguradoras')}
           style={{
             padding: '12px 24px',
-            background: activeTab === 'seguradoras' ? '#10b981' : 'transparent',
+            background: activeTab === 'seguradoras' ? '#11A561' : 'transparent',
             color: activeTab === 'seguradoras' ? '#fff' : '#64748b',
             border: 'none',
             borderRadius: '8px',
@@ -323,7 +397,7 @@ export default function Configuracoes() {
                 }}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
@@ -502,7 +576,7 @@ export default function Configuracoes() {
                 }}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
@@ -706,7 +780,7 @@ export default function Configuracoes() {
               {/* Header */}
               <div style={{
                 padding: '24px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                 color: '#fff',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -743,6 +817,93 @@ export default function Configuracoes() {
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>
                     📝 Informações Básicas
                   </h3>
+
+                  {/* Logo/Imagem para o PDF */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#334155', fontSize: '13px' }}>
+                      🖼️ Logo/Imagem (aparecerá no cabeçalho do PDF)
+                    </label>
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '16px', 
+                      alignItems: 'center',
+                      padding: '16px',
+                      background: '#f8fafc',
+                      borderRadius: '8px',
+                      border: '2px dashed #cbd5e1'
+                    }}>
+                      {novaChecklist.logoBase64 ? (
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1 }}>
+                          <img 
+                            src={novaChecklist.logoBase64} 
+                            alt="Logo Preview" 
+                            style={{ 
+                              width: '80px', 
+                              height: '80px', 
+                              objectFit: 'contain',
+                              borderRadius: '8px',
+                              background: '#fff',
+                              padding: '8px',
+                              border: '1px solid #e2e8f0'
+                            }} 
+                          />
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#0f172a', fontWeight: '600' }}>
+                              ✅ Logo carregada com sucesso
+                            </p>
+                            <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                              Esta imagem aparecerá no topo do PDF da checklist
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setNovaChecklist({ ...novaChecklist, logoBase64: '' })}
+                            style={{
+                              padding: '8px 16px',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🗑️ Remover
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ flex: 1 }}>
+                          <label 
+                            htmlFor="logo-upload"
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '20px',
+                              cursor: 'pointer',
+                              textAlign: 'center'
+                            }}
+                          >
+                            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>
+                            <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>
+                              Clique para selecionar uma imagem
+                            </p>
+                            <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>
+                              PNG, JPG ou GIF (máx. 2MB)
+                            </p>
+                          </label>
+                          <input
+                            id="logo-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            style={{ display: 'none' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#334155', fontSize: '13px' }}>
@@ -1010,7 +1171,10 @@ export default function Configuracoes() {
                     />
                     <select
                       value={checklistItemTipo}
-                      onChange={(e) => setChecklistItemTipo(e.target.value)}
+                      onChange={(e) => {
+                        setChecklistItemTipo(e.target.value);
+                        setShowOpcoesInput(e.target.value === 'multipla_escolha');
+                      }}
                       style={{
                         padding: '10px',
                         border: '1px solid #e2e8f0',
@@ -1025,12 +1189,13 @@ export default function Configuracoes() {
                       <option value="numero">🔢 Número</option>
                       <option value="data">📅 Data</option>
                       <option value="observacao">💬 Observação</option>
+                      <option value="multipla_escolha">☑️ Múltipla Escolha</option>
                     </select>
                     <button
                       onClick={adicionarItemChecklist}
                       style={{
                         padding: '10px 16px',
-                        background: '#667eea',
+                        background: '#2C30D5',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '8px',
@@ -1042,6 +1207,39 @@ export default function Configuracoes() {
                       + Adicionar
                     </button>
                   </div>
+
+                  {/* Input para opções de múltipla escolha */}
+                  {showOpcoesInput && (
+                    <div style={{
+                      marginBottom: '16px',
+                      padding: '12px',
+                      background: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '8px'
+                    }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', color: '#334155', fontSize: '13px' }}>
+                        ☑️ Opções da Múltipla Escolha (separe por vírgula)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Opção 1, Opção 2, Opção 3"
+                        value={multiplaEscolhaOpcoes}
+                        onChange={(e) => setMultiplaEscolhaOpcoes(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontFamily: 'inherit',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#64748b' }}>
+                        💡 Digite as opções separadas por vírgula. Ex: "Sim, Não, Não se aplica"
+                      </p>
+                    </div>
+                  )}
 
                   {novaChecklist.itens.length === 0 ? (
                     <div style={{
@@ -1059,59 +1257,194 @@ export default function Configuracoes() {
                       {novaChecklist.itens.map((item, idx) => (
                         <div
                           key={item.id}
+                          draggable
+                          onDragStart={() => handleDragStart(item)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(item)}
+                          onDragEnd={handleDragEnd}
                           style={{
                             display: 'flex',
-                            gap: '8px',
-                            alignItems: 'center',
-                            padding: '12px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px'
+                            flexDirection: 'column',
+                            gap: '12px',
+                            padding: '16px',
+                            background: draggedItem?.id === item.id ? '#e0e7ff' : (item.obrigatorio ? '#fef3c7' : '#f8fafc'),
+                            border: draggedItem?.id === item.id ? '2px dashed #2C30D5' : (item.obrigatorio ? '2px solid #f59e0b' : '1px solid #e2e8f0'),
+                            borderRadius: '8px',
+                            transition: 'all 0.2s',
+                            cursor: 'grab',
+                            opacity: draggedItem?.id === item.id ? 0.5 : 1
                           }}
                         >
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '13px', fontWeight: '500', color: '#0f172a', marginBottom: '4px' }}>
-                              {item.texto}
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                            {/* Ícone de arrastar */}
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              gap: '2px',
+                              cursor: 'grab',
+                              padding: '4px',
+                              color: '#94a3b8'
+                            }}>
+                              <div style={{ width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }}></div>
+                              <div style={{ width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }}></div>
+                              <div style={{ width: '16px', height: '2px', background: 'currentColor', borderRadius: '1px' }}></div>
                             </div>
-                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                              Tipo: {item.tipo} {item.obrigatorio && '• 🔒 Obrigatório'}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ 
+                                fontSize: '14px', 
+                                fontWeight: '600', 
+                                color: '#0f172a', 
+                                marginBottom: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  width: '24px',
+                                  height: '24px',
+                                  background: item.obrigatorio ? '#f59e0b' : '#94a3b8',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  {idx + 1}
+                                </span>
+                                {item.texto}
+                                {item.obrigatorio && <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '700' }}>★ OBRIGATÓRIO</span>}
+                              </div>
+                              <div style={{ 
+                                fontSize: '12px', 
+                                color: '#64748b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                flexWrap: 'wrap'
+                              }}>
+                                <span style={{
+                                  padding: '2px 8px',
+                                  background: '#e0e7ff',
+                                  color: '#4f46e5',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '600'
+                                }}>
+                                  {item.tipo === 'texto' && '📝 Texto'}
+                                  {item.tipo === 'foto' && '📷 Foto'}
+                                  {item.tipo === 'assinatura' && '✍️ Assinatura'}
+                                  {item.tipo === 'numero' && '🔢 Número'}
+                                  {item.tipo === 'data' && '📅 Data'}
+                                  {item.tipo === 'observacao' && '💬 Observação'}
+                                  {item.tipo === 'multipla_escolha' && '☑️ Múltipla Escolha'}
+                                </span>
+                              </div>
+                              {item.tipo === 'multipla_escolha' && item.opcoes && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '8px',
+                                  background: '#f0f9ff',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  color: '#0369a1'
+                                }}>
+                                  <strong>Opções:</strong> {item.opcoes.join(', ')}
+                                </div>
+                              )}
+                              {item.dica && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '8px',
+                                  background: '#e0f2fe',
+                                  borderLeft: '3px solid #2C30D5',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  color: '#0c4a6e'
+                                }}>
+                                  💡 {item.dica}
+                                </div>
+                              )}
                             </div>
+                            <button
+                              onClick={() => removerItemChecklist(item.id)}
+                              style={{
+                                padding: '8px 12px',
+                                background: '#fee2e2',
+                                color: '#dc2626',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              🗑️ Remover
+                            </button>
                           </div>
-                          <label style={{
+
+                          {/* Controles de personalização */}
+                          <div style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '12px',
-                            color: '#64748b',
-                            cursor: 'pointer'
+                            gap: '12px',
+                            flexWrap: 'wrap',
+                            paddingTop: '12px',
+                            borderTop: '1px solid #e2e8f0'
                           }}>
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '13px',
+                              color: '#64748b',
+                              cursor: 'pointer',
+                              padding: '6px 12px',
+                              background: item.obrigatorio ? '#fef3c7' : '#fff',
+                              border: item.obrigatorio ? '1px solid #f59e0b' : '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              fontWeight: item.obrigatorio ? '600' : '500',
+                              transition: 'all 0.2s'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={item.obrigatorio}
+                                onChange={(e) => {
+                                  const novoItens = [...novaChecklist.itens];
+                                  const itemIdx = novoItens.findIndex(i => i.id === item.id);
+                                  novoItens[itemIdx].obrigatorio = e.target.checked;
+                                  setNovaChecklist({ ...novaChecklist, itens: novoItens });
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                              {item.obrigatorio ? '★ Campo Obrigatório' : '☆ Tornar Obrigatório'}
+                            </label>
+
                             <input
-                              type="checkbox"
-                              checked={item.obrigatorio}
+                              type="text"
+                              placeholder="💡 Adicionar dica para o prestador..."
+                              value={item.dica || ''}
                               onChange={(e) => {
                                 const novoItens = [...novaChecklist.itens];
                                 const itemIdx = novoItens.findIndex(i => i.id === item.id);
-                                novoItens[itemIdx].obrigatorio = e.target.checked;
+                                novoItens[itemIdx].dica = e.target.value;
                                 setNovaChecklist({ ...novaChecklist, itens: novoItens });
                               }}
+                              style={{
+                                flex: 1,
+                                padding: '6px 12px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontFamily: 'inherit',
+                                minWidth: '200px'
+                              }}
                             />
-                            Obrigatório
-                          </label>
-                          <button
-                            onClick={() => removerItemChecklist(item.id)}
-                            style={{
-                              padding: '6px 12px',
-                              background: '#fee2e2',
-                              color: '#dc2626',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              fontWeight: '600'
-                            }}
-                          >
-                            Remover
-                          </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1147,7 +1480,7 @@ export default function Configuracoes() {
                   onClick={salvarChecklist}
                   style={{
                     padding: '10px 20px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '8px',
@@ -1203,7 +1536,7 @@ export default function Configuracoes() {
             >
               <div style={{
                 padding: '24px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                 color: '#fff',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1407,7 +1740,7 @@ export default function Configuracoes() {
                   onClick={salvarSeguradora}
                   style={{
                     padding: '10px 20px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #2C30D5 0%, #889DD3 100%)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '8px',
