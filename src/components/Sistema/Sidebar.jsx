@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import NotificationCenter from "../Notificacoes/NotificationCenter";
-import { FiClipboard, FiShoppingCart, FiPackage, FiDollarSign, FiUsers, FiCpu, FiSettings } from 'react-icons/fi';
+import { FiClipboard, FiShoppingCart, FiPackage, FiDollarSign, FiUsers, FiCpu, FiSettings, FiHome, FiMessageSquare } from 'react-icons/fi';
 
 const allItems = [
+  { rota:"home", nome:"Dashboard", icon: FiHome, allowedRoles: ['admin', 'gerente', 'funcionario', 'prestador'] },
   { rota:"os", nome:"Ordem de Serviço", icon: FiClipboard, allowedRoles: ['admin', 'gerente', 'funcionario', 'prestador'] },
   { rota:"compras", nome:"Compras", icon: FiShoppingCart, allowedRoles: ['admin', 'gerente', 'funcionario'] },
   { rota:"estoque", nome:"Estoque", icon: FiPackage, allowedRoles: ['admin', 'gerente', 'funcionario'] },
   { rota:"financeiro", nome:"Financeiro", icon: FiDollarSign, allowedRoles: ['admin', 'gerente'] },
   { rota:"crm", nome:"CRM", icon: FiUsers, allowedRoles: ['admin'] }, // ⚠️ SOMENTE ADMIN
+  { rota:"chat", nome:"Chat", icon: FiMessageSquare, allowedRoles: ['admin', 'gerente', 'funcionario', 'prestador'] },
   { rota:"automacao", nome:"Automação", icon: FiCpu, allowedRoles: ['admin', 'gerente'] },
   { rota:"configuracoes", nome:"Configurações", icon: FiSettings, allowedRoles: ['admin', 'gerente', 'funcionario', 'prestador'] },
 ];
