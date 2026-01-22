@@ -56,6 +56,14 @@ export async function login({ cnpj, usuario, senha }) {
     const q = query(usersRef, where('username', '==', usuario));
     const snap = await getDocs(q);
     const user = snap.empty ? null : snap.docs[0].data();
+    
+    // 🔐 ARMAZENAR ROLE NO LOCALSTORAGE (para controle de acesso no frontend)
+    if (user && user.role) {
+      localStorage.setItem('userRole', user.role);
+    } else {
+      localStorage.setItem('userRole', 'funcionario'); // role padrão
+    }
+    
     return { token, userName: (user && user.displayName) || usuario, company: { cnpj: companyId }, user };
   } catch (err) {
     console.error('Erro de autenticação:', err.code);
@@ -97,26 +105,34 @@ export async function login({ cnpj, usuario, senha }) {
   }
 }
 
-export async function registerUser({ cnpj, usuario, senha, displayName, role = 'user', active = true, email, phone, address, addressNumber }) {
+export async function registerUser({ cnpj, usuario, senha, displayName, role = 'funcionario', active = true, email, phone, address, addressNumber }) {
+  // 🔐 VALIDAÇÃO DE ROLE - Permitir apenas roles válidas
+  const validRoles = ['admin', 'gerente', 'funcionario', 'prestador'];
+  const sanitizedRole = validRoles.includes(role) ? role : 'funcionario';
+  
+  const companyId = normalizeCnpj(cnpj);
+  if (!companyId) throw new Error('CNPJ inválido: informe o CNPJ da empresa ao cadastrar o usuário.');
+  
+  const usersRef = collection(db, 'companies', companyId, 'users');
   const authEmail = email || makeEmail(cnpj, usuario);
+  
   try {
     const res = await createUserWithEmailAndPassword(auth, authEmail, senha);
     const uid = res.user.uid;
-    // store profile in companies/{cnpj}/users collection
-    const companyId = normalizeCnpj(cnpj);
-    if (!companyId) throw new Error('CNPJ inválido: informe o CNPJ da empresa ao cadastrar o usuário.');
-    const usersRef = collection(db, 'companies', companyId, 'users');
+    
     await addDoc(usersRef, {
       uid,
       username: usuario,
       displayName: displayName || usuario,
-      role,
+      password: senha, // ⚠️ APENAS PARA DESENVOLVIMENTO - Remover em produção
+      role: sanitizedRole, // 🔐 Role validada
       active: !!active,
       email: email || authEmail || null,
       phone: phone || null,
       address: address || null,
       addressNumber: addressNumber || null,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString()
     });
     return { uid };
   } catch (err) {
@@ -145,37 +161,30 @@ export async function createCompany(cnpj, data = {}) {
   return { exists: true, company: newSnap.data() };
 }
 
-export async function updateUser(cnpj, userName, updates = {}) {
+export async function updateUser(cnpj, userId, updates = {}) {
   const companyId = normalizeCnpj(cnpj);
   if (!companyId) throw new Error('CNPJ inválido');
-  if (!userName) throw new Error('userName requerido');
+  if (!userId) throw new Error('userId requerido');
   
-  console.log('🔍 updateUser - Buscando usuário:', userName);
+  console.log('🔍 updateUser - ID do documento:', userId);
   console.log('📍 CNPJ:', companyId);
+  console.log('📝 Updates:', updates);
   
-  // Buscar o usuário pelo username para obter o ID correto do documento
-  const usersRef = collection(db, 'companies', companyId, 'users');
-  const q = query(usersRef, where('username', '==', userName));
-  const snap = await getDocs(q);
+  // 🔒 SEMPRE USAR ID DO DOCUMENTO - NUNCA BUSCAR POR NOME
+  // IDs do Firestore são únicos e garantem que alteramos o usuário correto
+  const userRef = doc(db, 'companies', companyId, 'users', userId);
+  const snap = await getDoc(userRef);
   
-  console.log('📊 Resultados encontrados:', snap.size);
-  
-  if (snap.empty) {
-    // Listar todos os usuários para debug
-    console.log('⚠️ Usuário não encontrado. Listando todos os usuários:');
-    const allUsersSnap = await getDocs(usersRef);
-    allUsersSnap.forEach(doc => {
-      console.log('  - ID:', doc.id, '| username:', doc.data().username);
-    });
-    throw new Error('Usuário não encontrado');
+  if (!snap.exists()) {
+    console.error('❌ Usuário não encontrado com ID:', userId);
+    throw new Error('Usuário não encontrado. Verifique se o ID está correto.');
   }
   
-  const userDoc = snap.docs[0];
-  console.log('✅ Usuário encontrado - ID do documento:', userDoc.id);
+  console.log('✅ Usuário encontrado:', snap.data().displayName || snap.data().username);
   
-  const userRef = doc(db, 'companies', companyId, 'users', userDoc.id);
+  // Atualizar documento
+  await updateDoc(userRef, { ...updates, lastModified: new Date().toISOString() });
   
-  await updateDoc(userRef, updates);
   const updatedSnap = await getDoc(userRef);
   return updatedSnap.exists() ? { id: updatedSnap.id, ...updatedSnap.data() } : null;
 }

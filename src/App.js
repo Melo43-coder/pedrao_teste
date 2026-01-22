@@ -151,6 +151,96 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+// 🔐 PROTEÇÃO ADMIN - Apenas usuários com role=admin podem acessar
+const AdminRoute = ({ children, allowedRoles = ['admin'] }) => {
+  const [hasAccess, setHasAccess] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkAccess = () => {
+      try {
+        const userRole = localStorage.getItem('userRole');
+        
+        // Verificar se a role do usuário está na lista de roles permitidas
+        if (userRole && allowedRoles.includes(userRole)) {
+          setHasAccess(true);
+        } else {
+          setHasAccess(false);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao verificar permissões:', error);
+        setHasAccess(false);
+        setLoading(false);
+      }
+    };
+
+    checkAccess();
+  }, [allowedRoles]);
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#f3f4f6'
+      }}>
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <p style={{ color: '#6b7280' }}>Verificando permissões...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#f3f4f6',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          background: '#fff',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          maxWidth: '500px'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔒</div>
+          <h2 style={{ color: '#1f2937', marginBottom: '10px' }}>Acesso Negado</h2>
+          <p style={{ color: '#6b7280', marginBottom: '30px' }}>
+            Você não tem permissão para acessar esta área. Esta funcionalidade está disponível apenas para administradores.
+          </p>
+          <a 
+            href="/dashboard/home" 
+            style={{
+              display: 'inline-block',
+              padding: '12px 24px',
+              background: '#0ea5e9',
+              color: 'white',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontWeight: 'bold'
+            }}
+          >
+            Voltar ao Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 export default function App() {
   return (
     <AuthProvider>
@@ -171,16 +261,6 @@ export default function App() {
                 <Dashboard />
               </ProtectedRoute>
             } 
-          />
-
-          {/* Painel CRM (admin) */}
-          <Route
-            path="/crm"
-            element={
-              <ProtectedRoute>
-                <AdminPanel />
-              </ProtectedRoute>
-            }
           />
 
           {/* Redirecionamentos */}

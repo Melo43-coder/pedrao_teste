@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import {
+  FiHome,
+  FiClipboard,
+  FiShoppingCart,
+  FiPackage,
+  FiDollarSign,
+  FiUsers,
+  FiCpu,
+  FiSettings,
+  FiMenu,
+  FiX,
+  FiBell,
+  FiChevronDown
+} from "react-icons/fi";
+import logoZillo from "../../assets/Zillo-Logo.png";
 import OrdemServico from "./OrdemServico";
 import Compras from "./Compras";
 import Estoque from "./Estoque";
@@ -23,6 +38,63 @@ function formatCnpjDigits(value) {
   if (s.length !== 14) return value;
   return `${s.substring(0,2)}.${s.substring(2,5)}.${s.substring(5,8)}/${s.substring(8,12)}-${s.substring(12,14)}`;
 }
+
+// 🔐 COMPONENTE DE PROTEÇÃO ADMIN - Apenas usuários com role=admin
+const AdminOnlyRoute = ({ children }) => {
+  const [hasAccess, setHasAccess] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const userRole = localStorage.getItem('userRole');
+    const isAdmin = userRole === 'admin';
+    setHasAccess(isAdmin);
+    setLoading(false);
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p>Verificando permissões...</p>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div style={{
+        padding: '60px 40px',
+        textAlign: 'center',
+        background: '#f9fafb',
+        borderRadius: '12px',
+        margin: '40px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>🔒</div>
+        <h2 style={{ color: '#1f2937', marginBottom: '12px' }}>Acesso Restrito</h2>
+        <p style={{ color: '#6b7280', fontSize: '16px', maxWidth: '500px', margin: '0 auto 30px' }}>
+          Esta funcionalidade está disponível apenas para administradores do sistema.
+          Entre em contato com seu gerente para solicitar acesso.
+        </p>
+        <a 
+          href="/dashboard/home"
+          style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            background: '#0ea5e9',
+            color: 'white',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontWeight: '600'
+          }}
+        >
+          Voltar ao Dashboard
+        </a>
+      </div>
+    );
+  }
+
+  return children;
+};
 
 // Ícones para cada rota/aba
 const menu = [
@@ -121,8 +193,7 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
     <aside className={`sidebar ${isMobileMenuOpen ? "open" : ""}`}>
       <div className="logo-container">
         <h1 className="logo">
-          <span className="logo-icon">Z</span>
-          Zillo Assist
+          <img src={logoZillo} alt="Zillo" className="logo-icon" />
         </h1>
       </div>
       
@@ -151,34 +222,6 @@ function Sidebar({ isMobileMenuOpen, toggleMobileMenu }) {
         </ul>
       </nav>
       
-      <div className="menu-section support-section">
-        <div className="menu-title">
-          Suporte
-        </div>
-      </div>
-      
-      <div className="support-container">
-        <a href="#help" className="support-link">
-          <span className="support-icon">❓</span>
-          <span className="menu-text">Ajuda e Suporte</span>
-        </a>
-      </div>
-      {/* Admin-only link to manage company users */}
-      {userRole === 'admin' && (
-        <div style={{ padding: '8px 20px' }}>
-          <NavLink to="/dashboard/crm" className="menu-link crm-link">
-            Usuários (empresa){companyBadge ? <span className="company-badge">{companyBadge}</span> : null}
-          </NavLink>
-        </div>
-      )}
-      {(userRole === 'admin' || userRole === 'gerente') && (
-        <div style={{ padding: '4px 20px 12px' }}>
-          <NavLink to="/dashboard/users-edit" className="menu-link crm-link">
-            Gerenciar Usuários
-          </NavLink>
-        </div>
-      )}
-      
       <div className="user-profile">
         <div className="profile-card" onClick={handleProfileClick}>
           <div className="avatar">{userInitial}</div>
@@ -200,15 +243,6 @@ const UserDropdown = ({ isOpen, onClose, onLogout, onProfileClick }) => {
     <div className="user-dropdown">
       <div className="dropdown-arrow"></div>
       <ul className="dropdown-menu">
-        <li className="dropdown-item" onClick={onProfileClick}>
-          <span className="dropdown-icon">👤</span>
-          Meu Perfil
-        </li>
-        <li className="dropdown-item">
-          <span className="dropdown-icon">⚙️</span>
-          Configurações
-        </li>
-        <li className="dropdown-divider"></li>
         <li className="dropdown-item logout-item" onClick={onLogout}>
           <span className="dropdown-icon">🚪</span>
           Sair
@@ -233,6 +267,7 @@ const Header = ({ toggleMobileMenu }) => {
   
   const companyCnpj = localStorage.getItem('companyCnpj') || '';
   const userName = localStorage.getItem('userName') || 'Usuário';
+  const userPhoto = localStorage.getItem('userPhoto') || ''; // 🖼️ Foto do usuário
   
   // Extrair o caminho ativo após "dashboard"
   const currentPath = location.pathname.split('/').filter(x => x);
@@ -775,7 +810,22 @@ const Header = ({ toggleMobileMenu }) => {
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             aria-label="Menu do usuário"
           >
-            <div className="user-avatar-small">{userInitial}</div>
+            <div className="user-avatar-small">
+              {userPhoto ? (
+                <img 
+                  src={userPhoto} 
+                  alt={userName} 
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                userInitial
+              )}
+            </div>
             <span className="user-name-small">{userName}</span>
             <span className="dropdown-arrow-icon">▼</span>
           </button>
@@ -878,7 +928,8 @@ export default function Dashboard() {
             <Route path="/compras" element={<Compras />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/financeiro" element={<Financeiro />} />
-            <Route path="/crm" element={<CRM />} />
+            {/* 🔐 ROTA PROTEGIDA ADMIN - Apenas usuários admin podem acessar CRM */}
+            <Route path="/crm" element={<AdminOnlyRoute><CRM /></AdminOnlyRoute>} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/automacao" element={<Automacao />} />
             <Route path="/configuracoes" element={<Configuracoes />} />

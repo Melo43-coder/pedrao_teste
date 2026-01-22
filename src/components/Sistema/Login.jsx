@@ -248,6 +248,12 @@ export default function Login({ recoveryMode = false }) {
             // synthetic fallback email for display
             localStorage.setItem("userEmail", `${usuario}@${normalizeCnpj(cnpj)}.local`);
           }
+          // 🖼️ Salvar foto do usuário se disponível
+          if (res.user && res.user.photoURL) {
+            localStorage.setItem("userPhoto", res.user.photoURL);
+          } else {
+            localStorage.removeItem("userPhoto"); // Remover se não houver foto
+          }
 
           // Salvar role do usuário (usar dados do Firebase se disponível)
           if (res.user && res.user.role) {

@@ -31,6 +31,8 @@ export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [filter, setFilter] = useState('all'); // all | active | inactive
   const [confirmModal, setConfirmModal] = useState({ open: false, userId: null, nextActive: null, username: '' });
+  const [editModal, setEditModal] = useState({ open: false, user: null });
+  const [editData, setEditData] = useState({});
   const [modalProcessing, setModalProcessing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -85,6 +87,36 @@ export default function AdminPanel() {
     setCompanyCnpj(normalized);
     localStorage.setItem('companyCnpj', normalized);
     loadUsers(normalized);
+  };
+
+  const handleEditUser = (user) => {
+    setEditData({
+      displayName: user.displayName || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      address: user.address || '',
+      addressNumber: user.addressNumber || '',
+      photoURL: user.photoURL || '',
+      role: user.role || 'funcionario'
+    });
+    setEditModal({ open: true, user });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editModal.user) return;
+    
+    setModalProcessing(true);
+    try {
+      await firebase.updateUser(companyCnpj, editModal.user.id, editData);
+      await loadUsers(companyCnpj);
+      setEditModal({ open: false, user: null });
+      setEditData({});
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Erro ao atualizar usuário');
+    } finally {
+      setModalProcessing(false);
+    }
   };
 
   const stats = {
@@ -171,6 +203,7 @@ export default function AdminPanel() {
               <>
                 <UsersList
                   users={filteredUsers}
+                  onEdit={handleEditUser}
                   onRequestToggleActive={(userId, nextActive, username) => setConfirmModal({ open: true, userId, nextActive, username })}
                   onChangeRole={async (userId, role) => {
                     try {
@@ -204,6 +237,126 @@ export default function AdminPanel() {
                           }
                         }} style={{ padding: '8px 12px', borderRadius: 6, border: 'none', background: '#10b981', color: '#fff' }} disabled={modalProcessing}>
                           {modalProcessing ? 'Processando...' : (confirmModal.nextActive ? 'Ativar' : 'Desativar')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {editModal.open && editModal.user && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, overflowY: 'auto', padding: '20px' }}>
+                    <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: '100%', maxWidth: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', margin: 'auto' }}>
+                      <h3 style={{ marginTop: 0, marginBottom: 20, fontSize: 20, fontWeight: 700 }}>Editar Usuário: {editModal.user.username}</h3>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Foto */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Foto (URL)</label>
+                          <input
+                            type="text"
+                            value={editData.photoURL || ''}
+                            onChange={e => setEditData({ ...editData, photoURL: e.target.value })}
+                            placeholder="https://exemplo.com/foto.jpg"
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                          />
+                          {editData.photoURL && (
+                            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <img src={editData.photoURL} alt="Preview" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e5e7eb' }} />
+                              <span style={{ fontSize: 12, color: '#6b7280' }}>Preview da foto</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Nome Completo */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Nome Completo</label>
+                          <input
+                            type="text"
+                            value={editData.displayName || ''}
+                            onChange={e => setEditData({ ...editData, displayName: e.target.value })}
+                            placeholder="Nome completo do usuário"
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                          />
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Email</label>
+                          <input
+                            type="email"
+                            value={editData.email || ''}
+                            onChange={e => setEditData({ ...editData, email: e.target.value })}
+                            placeholder="email@exemplo.com"
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                          />
+                        </div>
+
+                        {/* Telefone */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Telefone</label>
+                          <input
+                            type="text"
+                            value={editData.phone || ''}
+                            onChange={e => setEditData({ ...editData, phone: e.target.value })}
+                            placeholder="(11) 91234-5678"
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                          />
+                        </div>
+
+                        {/* Endereço e Número */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Endereço</label>
+                            <input
+                              type="text"
+                              value={editData.address || ''}
+                              onChange={e => setEditData({ ...editData, address: e.target.value })}
+                              placeholder="Rua, Bairro, Cidade - UF"
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Número</label>
+                            <input
+                              type="text"
+                              value={editData.addressNumber || ''}
+                              onChange={e => setEditData({ ...editData, addressNumber: e.target.value })}
+                              placeholder="123"
+                              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Role */}
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 600, color: '#374151' }}>Nível de Acesso</label>
+                          <select
+                            value={editData.role || 'funcionario'}
+                            onChange={e => setEditData({ ...editData, role: e.target.value })}
+                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14 }}
+                          >
+                            <option value="prestador">Prestador</option>
+                            <option value="funcionario">Funcionário</option>
+                            <option value="gerente">Gerente</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid #e5e7eb' }}>
+                        <button
+                          onClick={() => { setEditModal({ open: false, user: null }); setEditData({}); }}
+                          disabled={modalProcessing}
+                          style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={modalProcessing}
+                          style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          {modalProcessing ? 'Salvando...' : '💾 Salvar Alterações'}
                         </button>
                       </div>
                     </div>
