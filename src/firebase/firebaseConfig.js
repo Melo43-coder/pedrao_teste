@@ -17,20 +17,32 @@ const firebaseConfig = {
 };
 
 // Validação: Verificar se todas as credenciais foram carregadas
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
-  console.error('❌ ERRO: Credenciais do Firebase não configuradas!');
-  console.error('📋 Configure o arquivo .env com as variáveis REACT_APP_FIREBASE_*');
-  console.error('💡 Copie o arquivo .env.example para .env e preencha os valores');
+const hasConfig = firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId;
+
+if (!hasConfig) {
+  console.warn('⚠️ AVISO: Credenciais do Firebase não configuradas!');
+  console.warn('📋 Configure as variáveis de ambiente na Vercel');
+  console.warn('🔧 Variáveis necessárias: REACT_APP_FIREBASE_*');
 }
 
 let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
-}
+let auth;
+let db;
 
-const auth = getAuth(app);
-const db = getFirestore(app);
+try {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApps()[0];
+  }
+
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error('❌ Erro ao inicializar Firebase:', error);
+  // Criar instâncias vazias para não quebrar a app
+  auth = null;
+  db = null;
+}
 
 export { app, auth, db };
